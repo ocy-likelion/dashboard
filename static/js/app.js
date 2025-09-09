@@ -216,15 +216,13 @@
     // Education
     async updateEducation(){
       try{
-        const res = await fetch('/api/education/stats');
+        const y = this.state.year || '2025';
+        const res = await fetch(`/api/education/counts?year=${encodeURIComponent(y)}`);
         const stats = await res.json();
         renderKpiCards(document.getElementById('education-kpis'), [
-          {label:'전체 과정', value: String(stats['전체과정수']||0)},
-          {label:'총 수강생', value: String(stats['총수강생']||0)},
-          {label:'평균 수료율', value: ((stats['평균수료율']||0)).toFixed(2)+'%'},
-          {label:'평균 취업률', value: ((stats['평균취업률']||0)).toFixed(2)+'%'}
+          {label:'전체 과정 수', value: String(stats['전체과정수']||0)},
+          {label:'총 수강생', value: String(stats['총수강생']||0)}
         ]);
-        const y = this.state.year || new Date().getFullYear();
         const tRes = await fetch(`/api/education/timeline/${y}`);
         const timeline = await tRes.json();
         renderTimeline(document.getElementById('education-timeline'), timeline);

@@ -648,6 +648,37 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
+    # New: education counts by year (default 2025)
+    @app.get('/api/education/counts')
+    def education_counts():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+            year = request.args.get('year') or '2025'
+            year_col = mapping.get('year') or '년도'
+            confirmed_col = mapping.get('confirmed')
+            params: List[Any] = []
+            where = ''
+            if year_col and year:
+                where = f"WHERE {year_col} = ?"
+                params.append(year)
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+            rows = [dict(r) for r in cur.fetchall()]
+            total_courses = len(rows)
+            total_students = 0
+            if confirmed_col:
+                for r in rows:
+                    total_students += parse_int(r.get(confirmed_col))
+            return jsonify({'전체과정수': total_courses, '총수강생': total_students, 'year': year})
+        except Exception as e:
+            print(e)
+            return jsonify({'전체과정수': 0, '총수강생': 0, 'year': None})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     @app.get('/api/education/timeline/<int:year>')
     def education_timeline(year: int):
         try:
