@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KDT Dashboard v3</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2Pkf4cGZ8wGx0Yf4Z1Z6hYl5T9P2WL9JQIVQwe7YIC5ZQ1RlfANH3a8G2g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">KDT Dashboard</div>
+      <nav>
+        <ul>
+          <li class="active" data-tab="dashboard-tab"><i class="fa-solid fa-gauge"></i> 대시보드</li>
+          <li data-tab="education-tab"><i class="fa-solid fa-graduation-cap"></i> 교육 운영</li>
+          <li data-tab="business-tab"><i class="fa-solid fa-briefcase"></i> 사업 운영</li>
+          <li data-tab="performance-tab"><i class="fa-solid fa-chart-line"></i> 성과 분석</li>
+          <li data-tab="programs-tab"><i class="fa-solid fa-list-check"></i> 과정 관리</li>
+          <li data-tab="settings-tab"><i class="fa-solid fa-gear"></i> 설정</li>
+        </ul>
+      </nav>
+      <button id="sidebarToggle" class="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+    </aside>
+
+    <main class="main">
+      <header class="filterbar">
+        <div class="filters">
+          <div class="dropdown" id="yearDropdown">
+            <button class="dropdown-toggle" type="button">년도 선택</button>
+            <ul class="dropdown-menu"></ul>
+          </div>
+          <div class="dropdown" id="quarterDropdown">
+            <button class="dropdown-toggle" type="button">분기 선택</button>
+            <ul class="dropdown-menu"></ul>
+          </div>
+          <div class="dropdown" id="categoryDropdown">
+            <button class="dropdown-toggle" type="button">과정구분/팀</button>
+            <ul class="dropdown-menu"></ul>
+          </div>
+          <div class="select-group">
+            <label for="statusSelect">진행상태</label>
+            <select id="statusSelect">
+              <option value="">전체</option>
+              <option value="진행중">진행중</option>
+              <option value="종강">종강</option>
+              <option value="예정">예정</option>
+            </select>
+          </div>
+        </div>
+        <div class="meta">
+          <span id="lastUpdated">-</span>
+        </div>
+      </header>
+
+      <section id="dashboard-tab" class="tab-content active">
+        <div class="cards" id="dashboard-kpis"></div>
+        <div class="toolbar">
+          <button class="btn" id="btnAllMetrics">전체 지표</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChart" height="120"></canvas>
+        </div>
+      </section>
+
+      <section id="education-tab" class="tab-content">
+        <div class="cards" id="education-kpis"></div>
+        <div class="timeline" id="education-timeline"></div>
+      </section>
+
+      <section id="business-tab" class="tab-content">
+        <div class="cards" id="business-kpis"></div>
+        <div class="chart-wrap">
+          <canvas id="revenueChart" height="120"></canvas>
+        </div>
+      </section>
+
+      <section id="performance-tab" class="tab-content">
+        <div class="performance">
+          <div class="calendar" id="performance-calendar"></div>
+          <div class="cards" id="performance-kpis"></div>
+        </div>
+      </section>
+
+      <section id="programs-tab" class="tab-content">
+        <div class="toolbar">
+          <button id="btnAddProgram" class="btn primary"><i class="fa-solid fa-plus"></i> 새 과정 추가</button>
+        </div>
+        <div id="programList" class="program-list empty-state"></div>
+      </section>
+
+      <section id="settings-tab" class="tab-content">
+        <div class="settings">
+          <p>설정 항목이 여기에 표시됩니다.</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="loadingOverlay" class="loading-overlay hidden">
+      <div class="spinner"></div>
+      <p>로딩중...</p>
+    </div>
+
+    <!-- Program Modal -->
+    <div id="programModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-content" role="document">
+        <header class="modal-header">
+          <h3 id="programModalTitle">과정 등록</h3>
+          <button class="modal-close" id="modalClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="modal-body">
+          <form id="programForm">
+            <div class="grid">
+              <label>과정명<input name="과정명" type="text" /></label>
+              <label>HRD_Net_과정명<input name="HRD_Net_과정명" type="text" /></label>
+              <label>과정코드<input name="과정코드" type="text" /></label>
+              <label>담당팀/팀/과정구분<input name="담당팀" type="text" /></label>
+              <label>기수/배치<input name="기수" type="text" /></label>
+              <label>회차<input name="회차" type="text" /></label>
+              <label>진행상태<input name="진행상태" type="text" /></label>
+              <label>개강(YYYY-MM-DD)<input name="개강일" type="text" placeholder="2025-01-01" /></label>
+              <label>종강(YYYY-MM-DD)<input name="종강일" type="text" placeholder="2025-03-31" /></label>
+              <label>년도<input name="년도" type="number" /></label>
+              <label>분기<input name="분기" type="text" placeholder="Q1" /></label>
+              <label>정원<input name="정원" type="number" /></label>
+              <label>HRD 확정<input name="HRD_확정" type="number" /></label>
+              <label>수료인원<input name="수료인원" type="number" /></label>
+              <label>취업인원<input name="취업인원" type="number" /></label>
+              <label>중도이탈<input name="중도이탈" type="number" /></label>
+              <label>근로자<input name="근로자" type="number" /></label>
+              <label>수료산정 제외인원<input name="수료산정 제외인원" type="number" /></label>
+              <label>취업산정제외인원<input name="취업산정제외인원" type="number" /></label>
+              <label>만족도(0~5)<input name="HRD_만족도" type="number" step="0.01" min="0" max="5" /></label>
+            </div>
+          </form>
+        </div>
+        <footer class="modal-footer">
+          <button id="btnDeleteProgram" class="btn danger">삭제</button>
+          <div class="spacer"></div>
+          <button id="btnCancelProgram" class="btn">취소</button>
+          <button id="btnSaveProgram" class="btn primary">저장</button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script src="/static/js/components.js"></script>
+    <script src="/static/js/app.js"></script>
+  </body>
+  </html>
+
+

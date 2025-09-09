@@ -1,0 +1,104 @@
+:root{
+  --bg:#ffffff; --panel:#ffffff; --muted:#6b7280; --text:#111827; --primary:#4f46e5; --ok:#059669; --warn:#d97706; --danger:#dc2626;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background:var(--bg); color:var(--text);}
+
+.sidebar{position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--panel); border-right:1px solid #e5e7eb; padding:16px;}
+.sidebar .logo{font-weight:700; margin-bottom:16px}
+.sidebar nav ul{list-style:none; padding:0; margin:0}
+.sidebar nav li{padding:10px 12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:10px; color:var(--muted)}
+.sidebar nav li.active, .sidebar nav li:hover{background:#f3f4f6; color:var(--text)}
+.sidebar.collapsed{width:64px}
+.sidebar-toggle{position:absolute; right:8px; bottom:8px; background:#f3f4f6; color:var(--text); border:1px solid #d1d5db; padding:8px 10px; border-radius:6px; cursor:pointer}
+
+.main{margin-left:240px; padding:20px}
+.sidebar.collapsed + .main{margin-left:64px}
+
+.filterbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px}
+.filters{display:flex; gap:12px; align-items:center}
+.select-group{display:flex; align-items:center; gap:6px}
+select, .dropdown .dropdown-toggle{background:#ffffff; border:1px solid #d1d5db; color:var(--text); padding:8px 10px; border-radius:8px}
+.dropdown{position:relative}
+.dropdown.open .dropdown-menu{display:block}
+.dropdown .dropdown-menu{display:none; position:absolute; top:110%; left:0; background:#ffffff; border:1px solid #e5e7eb; padding:6px; border-radius:8px; min-width:160px; z-index:10}
+.dropdown .dropdown-menu li{padding:8px 10px; border-radius:6px; cursor:pointer}
+.dropdown .dropdown-menu li:hover{background:#f3f4f6}
+
+.cards{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; margin-bottom:16px}
+.card{background:var(--panel); border:1px solid #e5e7eb; border-radius:12px; padding:14px}
+.card.kpi{cursor:pointer}
+.kpi-title{color:var(--muted); font-size:12px}
+.kpi-value{font-size:20px; font-weight:700}
+
+.toolbar{display:flex; gap:8px; margin:10px 0}
+.btn{background:#f3f4f6; color:var(--text); border:1px solid #d1d5db; padding:8px 12px; border-radius:8px; cursor:pointer}
+.btn.primary{background:var(--primary); border-color:var(--primary)}
+.btn.danger{background:var(--danger); border-color:var(--danger)}
+
+.chart-wrap{height:320px; background:var(--panel); border:1px solid #e5e7eb; border-radius:12px; padding:12px}
+/* Chart readability */
+.chart-wrap canvas{filter:contrast(1.05)}
+.chart-legend{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px}
+.chart-legend .item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted)}
+.chart-legend .dot{width:10px; height:10px; border-radius:50%}
+
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Education timeline */
+#education-tab .timeline{background:var(--panel); border:1px solid #e5e7eb; border-radius:12px; padding:10px}
+.timeline-header, .timeline-row{display:grid; grid-template-columns:220px repeat(12, 1fr); gap:6px; align-items:center}
+.timeline-col{height:26px; background:#f9fafb; border:1px dashed #e5e7eb; border-radius:6px; position:relative; overflow:hidden}
+.timeline-label{grid-column:1/2; font-size:12px; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.timeline-label.head{color:var(--muted); font-weight:600}
+.bar{height:100%; border-radius:4px; opacity:0.9}
+/* status-based colors */
+.status-예정{background:linear-gradient(90deg, #06b6d4, #22d3ee)}
+.status-진행중{background:linear-gradient(90deg, #a78bfa, #4f46e5)}
+.status-종강{background:linear-gradient(90deg, #10b981, #059669)}
+.status-취소{background:linear-gradient(90deg, #f43f5e, #ef4444)}
+/* Improve month labeling */
+.timeline-header .timeline-col{display:flex; align-items:center; justify-content:center; color:#6b7280; font-size:12px}
+.badge{display:inline-block; padding:2px 8px; border-radius:999px; background:#f3f4f6; border:1px solid #e5e7eb; font-size:11px; color:#374151}
+
+/* Program list */
+.program-list{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px}
+.program-list.empty-state{display:block; text-align:center; color:var(--muted)}
+.program .program-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px}
+.program .program-title{font-weight:700}
+.program .program-meta{display:flex; gap:8px; color:var(--muted); font-size:12px}
+
+/* Modal */
+.modal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.5)}
+.modal.hidden{display:none}
+.modal-content{background:var(--panel); border:1px solid #e5e7eb; border-radius:12px; width:min(860px, 92vw); max-height:90vh; overflow:auto}
+.modal-header, .modal-footer{display:flex; align-items:center; gap:8px; padding:12px; border-bottom:1px solid #e5e7eb}
+.modal-footer{border-top:1px solid #e5e7eb; border-bottom:none}
+.modal-body{padding:12px}
+.modal-close{background:#f9fafb; color:var(--text); border:1px solid #d1d5db; padding:6px 8px; border-radius:8px}
+.grid{display:grid; grid-template-columns:repeat(2, minmax(180px, 1fr)); gap:10px}
+.grid label{display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted)}
+.grid input{background:#ffffff; border:1px solid #d1d5db; border-radius:8px; color:var(--text); padding:8px}
+
+/* Toast */
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#ffffff; border:1px solid #d1d5db; color:var(--text); padding:10px 14px; border-radius:999px}
+.toast.hidden{display:none}
+.toast.error{background:#3b0d0d; border-color:#641919}
+
+/* Loading */
+.loading-overlay{position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.5)}
+.loading-overlay.hidden{display:none}
+.spinner{width:40px; height:40px; border-radius:50%; border:4px solid #e5e7eb; border-top-color:var(--primary); animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Responsive */
+@media (max-width: 900px){
+  .sidebar{position:fixed; transform:translateX(0); z-index:20}
+  .sidebar.collapsed{transform:translateX(-100%); width:240px}
+  .main{margin-left:0}
+  .timeline-header, .timeline-row{grid-template-columns:120px repeat(12,1fr)}
+}
+
+
