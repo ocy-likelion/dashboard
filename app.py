@@ -897,6 +897,107 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
+    @app.get('/api/business/monthly-revenue')
+    def business_monthly_revenue():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+            year = request.args.get('year') or '2025'
+            program_like = request.args.get('program_like')
+
+            # Load base programs with optional year filter
+            where = ''
+            params: List[Any] = []
+            year_col = mapping.get('year') or '년도'
+            if (year and year.lower() != 'all') and year_col:
+                where = f"WHERE {year_col} = ?"
+                params.append(year)
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+            programs = [dict(r) for r in cur.fetchall()]
+
+            name_col = mapping.get('name')
+            round_col = mapping.get('batch') or '회차'
+            start_col = mapping.get('start')
+
+            # Optional substring filter by program name
+            if program_like and name_col:
+                needle = str(program_like).strip()
+                programs = [p for p in programs if needle in str(p.get(name_col, ''))]
+
+            # Load monthly tables as maps by id (fail-safe if tables missing)
+            hours_map: Dict[int, Dict[str, Any]] = {}
+            enroll_map: Dict[int, Dict[str, Any]] = {}
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_hours")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    hours_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_enrollments")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    enroll_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+
+            months = [f"{m}M" for m in range(1, 13)]
+            UNIT = 18150
+
+            def to_int(v: Any) -> int:
+                return parse_int(v, 0)
+
+            items = []
+            month_totals = {m: 0 for m in months}
+            grand_total = 0
+
+            for p in programs:
+                pid = to_int(p.get('id'))
+                h = hours_map.get(pid, {})
+                e = enroll_map.get(pid, {})
+                row = {
+                    'program': p.get(name_col) or p.get('과정명'),
+                    'round': p.get(round_col)
+                }
+                total = 0
+                for m in months:
+                    v = to_int(h.get(m)) * to_int(e.get(m)) * UNIT
+                    row[m] = v
+                    month_totals[m] += v
+                    total += v
+                row['total'] = total
+                grand_total += total
+
+                # attach start date string for sorting (desc)
+                sdt = None
+                if start_col:
+                    sdt = safe_date(p.get(start_col))
+                    if not sdt and '개강' in (start_col or ''):
+                        sdt = safe_date(p.get('개강'))
+                row['_start'] = sdt.isoformat() if sdt else ''
+                items.append(row)
+
+            # Sort by start desc (empty last)
+            def sort_key(it):
+                s = it.get('_start') or ''
+                return (s == '', s)
+            items.sort(key=sort_key, reverse=True)
+            for it in items:
+                it.pop('_start', None)
+
+            totals = {'total': grand_total}
+            totals.update(month_totals)
+            return jsonify({'year': (None if (year and year.lower()=='all') else year), 'months': months, 'totals': totals, 'items': items})
+        except Exception as e:
+            print(e)
+            return jsonify({'year': None, 'months': [], 'totals': {}, 'items': []})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     # --------------------
     # Analytics: metrics by year/quarter/month/program
     # --------------------

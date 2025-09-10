@@ -147,8 +147,6 @@
         await this.updateEducation();
       }else if(id==='business-tab'){
         await this.updateBusiness();
-      }else if(id==='performance-tab'){
-        await this.updatePerformance();
       }else if(id==='programs-tab'){
         await this.updatePrograms();
       }
@@ -243,22 +241,14 @@
           {label:'최대 가능 매출', value: fmt(totals.max)}
         ]);
         renderRevenueTable(document.getElementById('business-table'), data.items||[]);
+
+        // Monthly revenue (optional view): can be toggled or rendered below table
+        // const m = await (await fetch(`/api/business/monthly-revenue?year=${encodeURIComponent(y)}`)).json();
+        // TODO: attach a chart/table using m.months and m.items if needed
       }catch(err){ console.error(err); }
     }
 
-    // Performance
-    async updatePerformance(){
-      // 간단: 연간 달력 렌더 + KPI 요약
-      const container = document.getElementById('performance-calendar');
-      renderYearCalendar(container, this.state.year || new Date().getFullYear());
-      const kpi = await (await fetch('/api/dashboard/kpi')).json();
-      renderKpiCards(document.getElementById('performance-kpis'), [
-        {label:'모집률', value: (kpi['모집률']||0).toFixed(2)+'%'},
-        {label:'취업률', value: (kpi['취업률']||0).toFixed(2)+'%'},
-        {label:'만족도', value: (kpi['만족도']||0).toFixed(2)},
-        {label:'수료율', value: (kpi['수료율']||0).toFixed(2)+'%'}
-      ]);
-    }
+    // Performance removed
 
     // Programs
     async updatePrograms(){
