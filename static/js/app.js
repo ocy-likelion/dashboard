@@ -28,7 +28,7 @@
       const required = [
         '#dashboard-kpis','#trendChart',
         '#education-kpis','#education-timeline',
-        '#business-kpis','#revenueChart',
+        '#business-kpis','#business-table',
         '#programList','#programModal'
       ];
       return new Promise(resolve => {
@@ -232,29 +232,17 @@
     // Business
     async updateBusiness(){
       try{
-        const k = await (await fetch('/api/business/kpi')).json();
+        const y = this.state.year || '2025';
+        const data = await (await fetch(`/api/business/revenue-metrics?year=${encodeURIComponent(y)}`)).json();
+        const totals = data.totals||{expected:0, actual:0, gap:0, max:0};
+        const fmt = (n)=> Number(n||0).toLocaleString('ko-KR');
         renderKpiCards(document.getElementById('business-kpis'), [
-          {label:'예산 집행률', value: (k['예산집행률']||0)+'%'},
-          {label:'진행률', value: (k['진행률']||0)+'%'},
-          {label:'목표 달성률', value: (k['목표달성률']||0)+'%'},
-          {label:'총 매출', value: String(k['총매출']||0)},
-          {label:'참여 인원', value: String(k['참여인원']||0)}
+          {label:'예상 매출 합계', value: fmt(totals.expected)},
+          {label:'실 매출 합계', value: fmt(totals.actual)},
+          {label:'차이 합계', value: fmt(totals.gap)},
+          {label:'최대 가능 매출', value: fmt(totals.max)}
         ]);
-        const trend = await (await fetch('/api/business/revenue-trend')).json();
-        const ctx = document.getElementById('revenueChart').getContext('2d');
-        if(this.state.revenueChart){ this.state.revenueChart.destroy(); }
-        this.state.revenueChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: trend.labels,
-            datasets: [
-              {label:'현재년', data: trend.current, borderColor:'#4f46e5', backgroundColor:'#4f46e5', tension:0.2},
-              {label:'전년', data: trend.previous, borderColor:'#6b7280', backgroundColor:'#6b7280', tension:0.2},
-              {label:'목표', data: trend.goal, borderColor:'#ef4444', backgroundColor:'#ef4444', borderDash:[6,6], tension:0.2}
-            ]
-          },
-          options: { responsive: true, maintainAspectRatio: false }
-        });
+        renderRevenueTable(document.getElementById('business-table'), data.items||[]);
       }catch(err){ console.error(err); }
     }
 

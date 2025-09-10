@@ -800,6 +800,223 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
+    # New: Business revenue metrics per program+round with yearly filter (year=all supported)
+    @app.get('/api/business/revenue-metrics')
+    def business_revenue_metrics():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+            year = request.args.get('year') or '2025'
+            year_col = mapping.get('year') or '년도'
+            start_col = mapping.get('start')
+            name_col = mapping.get('name')
+            round_col = mapping.get('batch') or '회차'
+            confirmed_col = mapping.get('confirmed')
+            completed_col = mapping.get('completed')
+            complete_excl_col = mapping.get('complete_excluded')
+            hours_col = '교육시간'
+
+            # Build where
+            where = ''
+            params: List[Any] = []
+            if (year and year.lower() != 'all') and year_col:
+                where = f"WHERE {year_col} = ?"
+                params.append(year)
+
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+            rows = [dict(r) for r in cur.fetchall()]
+
+            # Group by program+round
+            groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+            for r in rows:
+                program = str(r.get(name_col) or r.get('과정명') or '').strip()
+                rnd = str(r.get(round_col) or '').strip()
+                key = (program, rnd)
+                groups.setdefault(key, []).append(r)
+
+            UNIT = 18150
+            def to_int(v: Any) -> int:
+                return parse_int(v, 0)
+
+            items = []
+            for (program, rnd), grs in groups.items():
+                # Aggregate inputs over group (confirmed, completed, complete_excluded, hours)
+                confirmed_sum = sum(to_int(g.get(confirmed_col)) for g in grs) if confirmed_col else 0
+                completed_sum = sum(to_int(g.get(completed_col)) for g in grs) if completed_col else 0
+                excl_sum = sum(to_int(g.get(complete_excl_col)) for g in grs) if complete_excl_col else 0
+                hours_sum = sum(to_int(g.get(hours_col)) for g in grs)
+
+                # r: graduation rate based on current rule
+                denom = confirmed_sum - excl_sum
+                r = (completed_sum / denom) if denom > 0 else 0
+
+                expected = int(round(r * confirmed_sum * hours_sum * UNIT))
+                actual = int(round(completed_sum * hours_sum * UNIT))
+                maxrev = int(round(confirmed_sum * hours_sum * UNIT))
+                gap = expected - actual
+
+                # pick latest start date for sorting
+                best_dt: date | None = None
+                if start_col:
+                    for g in grs:
+                        dt = safe_date(g.get(start_col))
+                        if not dt and '개강' in (start_col or ''):
+                            dt = safe_date(g.get('개강'))
+                        if dt and (best_dt is None or dt > best_dt):
+                            best_dt = dt
+
+                items.append({
+                    'program': program,
+                    'round': rnd,
+                    'expected': expected,
+                    'actual': actual,
+                    'gap': gap,
+                    'max': maxrev,
+                    'start': best_dt.isoformat() if best_dt else None
+                })
+
+            # Sort by start desc (None last)
+            def sort_key(it):
+                s = it.get('start')
+                return (s is None, s)
+            items.sort(key=sort_key, reverse=True)
+
+            totals = {
+                'expected': int(sum(it['expected'] for it in items)),
+                'actual': int(sum(it['actual'] for it in items)),
+                'gap': int(sum(it['gap'] for it in items)),
+                'max': int(sum(it['max'] for it in items)),
+            }
+            return jsonify({'year': (None if (year and year.lower()=='all') else year), 'totals': totals, 'items': items})
+        except Exception as e:
+            print(e)
+            return jsonify({'year': None, 'totals': {'expected':0,'actual':0,'gap':0,'max':0}, 'items': []})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    # --------------------
+    # Analytics: metrics by year/quarter/month/program
+    # --------------------
+    @app.get('/api/analytics/metrics')
+    def analytics_metrics():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+
+            # Base filtering from query (year/quarter/category/status)
+            where, params = build_program_filters(request.args, mapping)
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+            rows = [dict(r) for r in cur.fetchall()]
+
+            # Optional program_like substring filter
+            program_like = request.args.get('program_like')
+            if program_like:
+                name_col = mapping.get('name')
+                if name_col:
+                    needle = str(program_like).strip()
+                    rows = [r for r in rows if needle in str(r.get(name_col, ''))]
+
+            granularity = (request.args.get('granularity') or 'quarter').lower()
+            ruleset = (request.args.get('ruleset') or 'dashboard').lower()
+
+            quarter_col = mapping.get('quarter') or '분기'
+            end_col = mapping.get('end')
+            name_col = mapping.get('name')
+            status_col = mapping.get('status')
+
+            def get_bucket_key(r: Dict[str, any]) -> str:
+                if granularity == 'year':
+                    # year by end date when available else by year column
+                    dt = safe_date(r.get(end_col)) if end_col else None
+                    if not dt and end_col and '종강' in end_col:
+                        dt = safe_date(r.get('종강'))
+                    if dt:
+                        return str(dt.year)
+                    ycol = mapping.get('year') or '년도'
+                    return str(r.get(ycol) or '')
+                if granularity == 'quarter':
+                    q = str(r.get(quarter_col) or '').strip() if quarter_col else ''
+                    if q:
+                        return q
+                    # fallback via end date
+                    dt = safe_date(r.get(end_col)) if end_col else None
+                    if not dt and end_col and '종강' in end_col:
+                        dt = safe_date(r.get('종강'))
+                    if dt:
+                        return f"Q{((dt.month - 1)//3) + 1}"
+                    return ''
+                if granularity == 'month':
+                    dt = safe_date(r.get(end_col)) if end_col else None
+                    if not dt and end_col and '종강' in end_col:
+                        dt = safe_date(r.get('종강'))
+                    return f"{dt.year}-{dt.month:02d}" if dt else ''
+                if granularity == 'program':
+                    return str(r.get(name_col) or '')
+                return ''
+
+            # Bucket rows
+            buckets: Dict[str, List[Dict[str, any]]] = {}
+            for r in rows:
+                key = get_bucket_key(r)
+                if not key:
+                    continue
+                buckets.setdefault(key, []).append(r)
+
+            def compute_dashboard_set(brs: List[Dict[str, Any]]):
+                # 모집률: 2025 종강 연도 대상
+                def end_year_is_2025(x: Dict[str, Any]) -> bool:
+                    dt = safe_date(x.get(end_col)) if end_col else None
+                    if not dt and end_col and '종강' in end_col:
+                        dt = safe_date(x.get('종강'))
+                    return bool(dt and dt.year == 2025)
+
+                rows_end2025 = [x for x in brs if end_year_is_2025(x)]
+                kpi_recruit = calc_kpis(rows_end2025, mapping)
+
+                # 수료율/만족도: 2025 종강 연도 + 상태 종강
+                rows_done_2025 = [x for x in rows_end2025 if status_col and str(x.get(status_col, '')).strip() == '종강']
+                kpi_done_2025 = calc_kpis(rows_done_2025, mapping)
+
+                # 취업률: 2024-07-01~2025-06-30 & 상태 종강 & 수료인원 존재
+                rows_window_done = [x for x in brs if ended_in_window_and_done(x, end_col, status_col, mapping.get('completed'))]
+                kpi_window = calc_kpis(rows_window_done, mapping)
+
+                return {
+                    '모집률': kpi_recruit['모집률'],
+                    '수료율': kpi_done_2025['수료율'],
+                    '취업률': kpi_window['취업률'],
+                    '만족도': kpi_done_2025['만족도']
+                }
+
+            def compute_raw_set(brs: List[Dict[str, Any]]):
+                k = calc_kpis(brs, mapping)
+                return {'모집률': k['모집률'], '수료율': k['수료율'], '취업률': k['취업률'], '만족도': k['만족도']}
+
+            result = []
+            for key in (['Q1','Q2','Q3','Q4'] if granularity=='quarter' else sorted(buckets.keys())):
+                brs = buckets.get(key, [])
+                if not brs:
+                    # keep empty buckets for quarter to show zeroes
+                    if granularity == 'quarter':
+                        result.append({'key': key, '모집률': 0, '수료율': 0, '취업률': 0, '만족도': 0})
+                    continue
+                metrics = compute_dashboard_set(brs) if ruleset=='dashboard' else compute_raw_set(brs)
+                # 트렌드 그래프가 만족도 100점 환산을 원할 수 있어도 원본(0~5) 유지; 프론트에서 환산
+                result.append({'key': key, **metrics})
+
+            return jsonify(result)
+        except Exception as e:
+            print(e)
+            return jsonify([])
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     return app
 
 

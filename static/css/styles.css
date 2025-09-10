@@ -70,6 +70,13 @@ select, .dropdown .dropdown-toggle{background:#ffffff; border:1px solid #d1d5db;
 .program .program-title{font-weight:700}
 .program .program-meta{display:flex; gap:8px; color:var(--muted); font-size:12px}
 
+/* Revenue table */
+.rev-row{display:grid; grid-template-columns:2fr 0.6fr 1fr 1fr 1fr 1fr; gap:8px; padding:8px 4px; border-bottom:1px solid #e5e7eb}
+.rev-row:first-child{border-bottom:2px solid #e5e7eb}
+.rev-col{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.rev-col.head{color:#6b7280; font-weight:600}
+.rev-col.right{text-align:right}
+
 /* Modal */
 .modal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.5)}
 .modal.hidden{display:none}

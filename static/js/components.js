@@ -124,6 +124,37 @@
     });
     container.appendChild(frag);
   }
+
+  // Currency formatter
+  function fmtWon(n){
+    const v = Number(n||0);
+    return v.toLocaleString('ko-KR');
+  }
+
+  // Revenue table
+  window.renderRevenueTable = function(container, data){
+    container.innerHTML = '';
+    const table = el('div','card');
+    const header = el('div','rev-row');
+    header.appendChild(el('div','rev-col head','과정명'));
+    header.appendChild(el('div','rev-col head','회차'));
+    header.appendChild(el('div','rev-col head right','예상 매출'));
+    header.appendChild(el('div','rev-col head right','실 매출'));
+    header.appendChild(el('div','rev-col head right','차이'));
+    header.appendChild(el('div','rev-col head right','최대 가능'));
+    table.appendChild(header);
+    (data||[]).forEach(it=>{
+      const row = el('div','rev-row');
+      row.appendChild(el('div','rev-col', it.program||''));
+      row.appendChild(el('div','rev-col', it.round||''));
+      row.appendChild(el('div','rev-col right', fmtWon(it.expected)));
+      row.appendChild(el('div','rev-col right', fmtWon(it.actual)));
+      row.appendChild(el('div','rev-col right', fmtWon(it.gap)));
+      row.appendChild(el('div','rev-col right', fmtWon(it.max)));
+      table.appendChild(row);
+    });
+    container.appendChild(table);
+  }
 })();
 
 
