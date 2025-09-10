@@ -811,6 +811,7 @@ def create_app() -> Flask:
             start_col = mapping.get('start')
             name_col = mapping.get('name')
             round_col = mapping.get('batch') or '회차'
+            quarter_col = mapping.get('quarter') or '분기'
             confirmed_col = mapping.get('confirmed')
             completed_col = mapping.get('completed')
             complete_excl_col = mapping.get('complete_excluded')
@@ -868,6 +869,7 @@ def create_app() -> Flask:
                 items.append({
                     'program': program,
                     'round': rnd,
+                    'quarter': grs[0].get(quarter_col) if grs else None,
                     'expected': expected,
                     'actual': actual,
                     'gap': gap,

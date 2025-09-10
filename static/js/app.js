@@ -258,7 +258,19 @@
           {label:'차이 합계', value: fmt(totals.gap)},
           {label:'최대 가능 매출', value: fmt(totals.max)}
         ]);
-        renderRevenueTable(document.getElementById('business-table'), data.items||[]);
+        const quarterSel = document.getElementById('quarterFilter');
+        const items = (data.items||[]);
+        const applyFilter = ()=>{
+          const q = quarterSel.value;
+          const filtered = q ? items.filter(it=> String(it.quarter||'')===q) : items;
+          renderRevenueTable(document.getElementById('business-table'), filtered);
+        }
+        if(quarterSel){
+          quarterSel.removeEventListener('change', this._onQuarterChange);
+          this._onQuarterChange = applyFilter;
+          quarterSel.addEventListener('change', this._onQuarterChange);
+        }
+        applyFilter();
 
         // Monthly revenue (optional view): can be toggled or rendered below table
         // const m = await (await fetch(`/api/business/monthly-revenue?year=${encodeURIComponent(y)}`)).json();

@@ -138,6 +138,7 @@
     const header = el('div','rev-row');
     header.appendChild(el('div','rev-col head','과정명'));
     header.appendChild(el('div','rev-col head','회차'));
+    header.appendChild(el('div','rev-col head','분기'));
     header.appendChild(el('div','rev-col head right','예상 매출'));
     header.appendChild(el('div','rev-col head right','실 매출'));
     header.appendChild(el('div','rev-col head right','차이'));
@@ -146,7 +147,8 @@
     (data||[]).forEach(it=>{
       const row = el('div','rev-row');
       row.appendChild(el('div','rev-col', it.program||''));
-      row.appendChild(el('div','rev-col', it.round||''));
+      row.appendChild(el('div','rev-col', String(it.round||'')));
+      row.appendChild(el('div','rev-col', String(it.quarter||'')));
       row.appendChild(el('div','rev-col right', fmtWon(it.expected)));
       row.appendChild(el('div','rev-col right', fmtWon(it.actual)));
       row.appendChild(el('div','rev-col right', fmtWon(it.gap)));
