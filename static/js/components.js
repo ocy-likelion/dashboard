@@ -178,6 +178,14 @@
     });
     container.appendChild(table);
   }
+
+  // Format currency helper function
+  window.formatCurrency = function(amount) {
+    if (typeof amount !== 'number') {
+      amount = parseFloat(amount) || 0;
+    }
+    return amount.toLocaleString('ko-KR') + '원';
+  };
 })();
 
 

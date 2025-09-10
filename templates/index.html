@@ -90,6 +90,16 @@
           <button class="btn" id="btnLoadMonthly">월별 예상 매출 보기</button>
         </div>
         <div id="monthly-expected"></div>
+        
+        <div class="toolbar" id="progression-controls">
+          <input id="progressionYear" type="number" placeholder="2025" style="width:120px" />
+          <input id="progressionProgramLike" type="text" placeholder="과정 검색" style="width:200px" />
+          <button class="btn primary" id="btnLoadProgression">등차수열 월별 매출 분석</button>
+        </div>
+        <div class="chart-wrap" id="progression-chart-wrap" style="display:none;">
+          <canvas id="progressionChart" height="120"></canvas>
+        </div>
+        <div id="progression-details"></div>
       </section>
 
 

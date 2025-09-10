@@ -1223,6 +1223,133 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
+    # New: Monthly revenue with arithmetic progression for enrollment decline
+    @app.get('/api/business/monthly-revenue-progression')
+    def business_monthly_revenue_progression():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+            year = request.args.get('year') or '2025'
+            program_like = request.args.get('program_like', '').strip()
+            
+            year_col = mapping.get('year') or '년도'
+            name_col = mapping.get('name')
+            round_col = mapping.get('batch') or '회차'
+            start_col = mapping.get('start')
+            end_col = mapping.get('end')
+            confirmed_col = mapping.get('confirmed')
+            completed_col = mapping.get('completed')
+            hours_col = '교육시간'
+            
+            # Build where clause
+            where = ''
+            params: List[Any] = []
+            if year and year.lower() != 'all' and year_col:
+                where = f"WHERE {year_col} = ?"
+                params.append(year)
+            
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+            programs = [dict(r) for r in cur.fetchall()]
+            
+            # Filter by program name if specified
+            if program_like and name_col:
+                programs = [p for p in programs if program_like in str(p.get(name_col, ''))]
+            
+            UNIT = 18150
+            result_items = []
+            total_monthly_revenue = {}
+            
+            for program in programs:
+                program_name = str(program.get(name_col) or program.get('과정명') or '').strip()
+                round_num = str(program.get(round_col) or '').strip()
+                start_date = safe_date(program.get(start_col))
+                end_date = safe_date(program.get(end_col))
+                confirmed = parse_int(program.get(confirmed_col)) if confirmed_col else 0
+                completed = parse_int(program.get(completed_col)) if completed_col else 0
+                hours = parse_int(program.get(hours_col))
+                
+                if not start_date or not end_date or confirmed <= 0 or hours <= 0:
+                    continue
+                
+                # Calculate duration in months
+                duration_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month) + 1
+                if duration_months <= 0:
+                    duration_months = 1
+                
+                # Calculate arithmetic progression
+                # a = (confirmed - completed) / duration_months
+                decline_per_month = (confirmed - completed) / duration_months
+                
+                monthly_data = []
+                current_date = start_date.replace(day=1)  # Start from first day of start month
+                
+                for month_idx in range(duration_months):
+                    # Calculate enrollment for this month using arithmetic sequence
+                    enrollment_this_month = confirmed - (month_idx * decline_per_month)
+                    
+                    # Ensure enrollment doesn't go below completed count
+                    if month_idx == duration_months - 1:
+                        enrollment_this_month = completed
+                    elif enrollment_this_month < completed:
+                        enrollment_this_month = completed
+                    
+                    # Calculate monthly revenue
+                    monthly_hours = hours / duration_months  # Distribute hours evenly
+                    monthly_revenue = int(round(enrollment_this_month * monthly_hours * UNIT))
+                    
+                    month_key = current_date.strftime('%Y-%m')
+                    monthly_data.append({
+                        'month': month_key,
+                        'enrollment': round(enrollment_this_month, 1),
+                        'hours': round(monthly_hours, 1),
+                        'revenue': monthly_revenue
+                    })
+                    
+                    # Add to total
+                    if month_key not in total_monthly_revenue:
+                        total_monthly_revenue[month_key] = 0
+                    total_monthly_revenue[month_key] += monthly_revenue
+                    
+                    # Move to next month
+                    if current_date.month == 12:
+                        current_date = current_date.replace(year=current_date.year + 1, month=1)
+                    else:
+                        current_date = current_date.replace(month=current_date.month + 1)
+                
+                result_items.append({
+                    'program': program_name,
+                    'round': round_num,
+                    'confirmed': confirmed,
+                    'completed': completed,
+                    'duration_months': duration_months,
+                    'decline_per_month': round(decline_per_month, 2),
+                    'monthly_data': monthly_data,
+                    'total_revenue': sum(item['revenue'] for item in monthly_data)
+                })
+            
+            # Convert total_monthly_revenue to sorted list
+            monthly_totals = [
+                {'month': month, 'total_revenue': revenue}
+                for month, revenue in sorted(total_monthly_revenue.items())
+            ]
+            
+            return jsonify({
+                'year': year if year != 'all' else None,
+                'program_filter': program_like or None,
+                'monthly_totals': monthly_totals,
+                'programs': result_items,
+                'grand_total': sum(total_monthly_revenue.values())
+            })
+            
+        except Exception as e:
+            print(f"Error in monthly revenue progression: {e}")
+            return jsonify({'error': str(e)}), 500
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     return app
 
 
