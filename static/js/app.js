@@ -76,6 +76,24 @@
       // Dashboard control
       const btnAll = document.getElementById('btnAllMetrics');
       btnAll.addEventListener('click', ()=> this.updateTrendChart());
+
+      // Business monthly expected
+      const btnMonthly = document.getElementById('btnLoadMonthly');
+      if(btnMonthly){
+        btnMonthly.addEventListener('click', async ()=>{
+          try{
+            const y = document.getElementById('monthlyYear').value || (this.state.year || '2025');
+            const m = document.getElementById('monthlyMonth').value || '7';
+            const q = new URLSearchParams();
+            q.set('year', y); q.set('month', m);
+            const like = (document.getElementById('monthlyProgramLike').value||'').trim();
+            if(like) q.set('program_like', like);
+            const res = await fetch(`/api/business/monthly-expected?${q.toString()}`);
+            const out = await res.json();
+            renderMonthlyExpectedTable(document.getElementById('monthly-expected'), out.items||[]);
+          }catch(err){ console.error(err); }
+        });
+      }
     }
 
     showLoading(on){

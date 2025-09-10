@@ -155,6 +155,27 @@
     });
     container.appendChild(table);
   }
+
+  // Monthly expected table (per program)
+  window.renderMonthlyExpectedTable = function(container, items){
+    container.innerHTML = '';
+    const table = el('div','card');
+    const head = el('div','rev-row');
+    head.appendChild(el('div','rev-col head','과정명'));
+    head.appendChild(el('div','rev-col head','회차'));
+    head.appendChild(el('div','rev-col head right','월 인덱스'));
+    head.appendChild(el('div','rev-col head right','예상 매출'));
+    table.appendChild(head);
+    (items||[]).forEach(it=>{
+      const row = el('div','rev-row');
+      row.appendChild(el('div','rev-col', it.program||''));
+      row.appendChild(el('div','rev-col', it.round||''));
+      row.appendChild(el('div','rev-col right', String(it.monthIndex||0)));
+      row.appendChild(el('div','rev-col right', Number(it.expected||0).toLocaleString('ko-KR')));
+      table.appendChild(row);
+    });
+    container.appendChild(table);
+  }
 })();
 
 

@@ -998,6 +998,109 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
+    @app.get('/api/business/monthly-expected')
+    def business_monthly_expected():
+        try:
+            conn = get_db_connection()
+            mapping = get_schema_mapping(conn)
+            year = int(request.args.get('year') or 2025)
+            month = int(request.args.get('month') or 7)
+            program_like = request.args.get('program_like')
+
+            name_col = mapping.get('name')
+            round_col = mapping.get('batch') or '회차'
+            start_col = mapping.get('start')
+            end_col = mapping.get('end')
+
+            # load programs for (year) - use overlap with the target month window based on start/end
+            cur = conn.execute("SELECT * FROM kdt_programs")
+            programs = [dict(r) for r in cur.fetchall()]
+            if program_like and name_col:
+                needle = str(program_like).strip()
+                programs = [p for p in programs if needle in str(p.get(name_col, ''))]
+
+            # hours/enroll maps by id
+            hours_map: Dict[int, Dict[str, Any]] = {}
+            enroll_map: Dict[int, Dict[str, Any]] = {}
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_hours")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    hours_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_enrollments")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    enroll_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+
+            # helpers
+            def month_start(y: int, m: int) -> date:
+                return date(y, m, 1)
+
+            def month_end(y: int, m: int) -> date:
+                if m == 12:
+                    return date(y, 12, 31)
+                return date(y, m+1, 1) - timedelta(days=1)
+
+            from datetime import timedelta
+            window_start = month_start(year, month)
+            window_end = month_end(year, month)
+
+            def months_since_start(s: date, target: date) -> int:
+                # count start month as 1M
+                return (target.year - s.year) * 12 + (target.month - s.month) + 1
+
+            UNIT = 18150
+            items = []
+            total = 0
+
+            for p in programs:
+                pid = parse_int(p.get('id'))
+                sdt = safe_date(p.get(start_col)) if start_col else None
+                if not sdt and start_col and '개강' in start_col:
+                    sdt = safe_date(p.get('개강'))
+                edt = safe_date(p.get(end_col)) if end_col else None
+                if not edt and end_col and '종강' in end_col:
+                    edt = safe_date(p.get('종강'))
+                if not sdt:
+                    continue
+                # overlap check: course active in the target month
+                if sdt > window_end:
+                    continue
+                if edt and edt < window_start:
+                    continue
+
+                m_index = months_since_start(sdt, window_start)
+                if m_index < 1 or m_index > 12:
+                    continue
+                col = f"{m_index}M"
+                h = hours_map.get(pid, {}).get(col)
+                e = enroll_map.get(pid, {}).get(col)
+                expected = parse_int(h) * parse_int(e) * UNIT
+                total += expected
+                items.append({
+                    'program': p.get(name_col) or p.get('과정명'),
+                    'round': p.get(round_col),
+                    'monthIndex': m_index,
+                    'expected': expected
+                })
+
+            # sort by expected desc
+            items.sort(key=lambda x: x['expected'], reverse=True)
+            return jsonify({'year': year, 'month': month, 'total': total, 'items': items})
+        except Exception as e:
+            print(e)
+            return jsonify({'year': None, 'month': None, 'total': 0, 'items': []})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     # --------------------
     # Analytics: metrics by year/quarter/month/program
     # --------------------
