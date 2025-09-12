@@ -206,6 +206,11 @@ def create_app() -> Flask:
         total_emp_excl = 0
         total_workers = 0
         total_complete_excl = 0
+        
+        # 수료율 계산용 (impact hub 제외)
+        completion_confirmed = 0
+        completion_completed = 0
+        completion_complete_excl = 0
 
         for r in rows:
             capacity = parse_int(r.get(mapping['capacity'])) if mapping['capacity'] else 0
@@ -216,6 +221,9 @@ def create_app() -> Flask:
             emp_excl = parse_int(r.get(mapping.get('employment_excluded'))) if mapping.get('employment_excluded') else 0
             workers = parse_int(r.get(mapping.get('workers'))) if mapping.get('workers') else 0
             comp_excl = parse_int(r.get(mapping.get('complete_excluded'))) if mapping.get('complete_excluded') else 0
+            
+            # 담당팀 확인
+            team = str(r.get(mapping.get('team', '')) or '').strip().lower()
 
             total_capacity += capacity
             total_confirmed += confirmed
@@ -227,15 +235,21 @@ def create_app() -> Flask:
             if mapping['satisfaction'] and r.get(mapping['satisfaction']) is not None:
                 satisfaction_sum += satis
                 satisfaction_count += 1
+            
+            # 수료율 계산용: impact hub 제외
+            if team != 'impact hub':
+                completion_confirmed += confirmed
+                completion_completed += completed
+                completion_complete_excl += comp_excl
 
         모집률 = (total_confirmed / total_capacity * 100) if total_capacity > 0 else 0.0
 
-        # 수료율 = (수료인원) / (HRD_확정 - 수료산정 제외인원) * 100
-        grad_den = total_confirmed - total_complete_excl
+        # 수료율 = (수료인원) / (HRD_확정 - 수료산정 제외인원) * 100 (impact hub 제외)
+        grad_den = completion_confirmed - completion_complete_excl
         if grad_den <= 0:
             수료율 = 0.0
         else:
-            수료율 = (total_completed / grad_den * 100)
+            수료율 = (completion_completed / grad_den * 100)
 
         # 취업률: 취업인원 / {수료인원 - (취업산정제외인원 + 근로자)}
         emp_den = total_completed - (total_emp_excl + total_workers)
