@@ -179,15 +179,58 @@
     container.appendChild(table);
   }
 
-  // 월별 매출 차트 데이터 가공 함수 (연도별 12개월 전체)
+  // 선택된 과정들의 운영 기간 분석
+  function analyzeProgramsPeriod(programsData, selectedPrograms) {
+    if (!selectedPrograms || selectedPrograms.length === 0) {
+      return null; // 전체 과정 선택 시
+    }
+    
+    let earliestDate = null;
+    let latestDate = null;
+    let allMonths = new Set();
+    
+    selectedPrograms.forEach(programName => {
+      const programInfo = programsData[programName];
+      if (!programInfo) return;
+      
+      const startDate = new Date(programInfo.start_date);
+      const endDate = new Date(programInfo.end_date);
+      
+      // 전체 기간의 최소/최대 날짜 계산
+      if (!earliestDate || startDate < earliestDate) {
+        earliestDate = startDate;
+      }
+      if (!latestDate || endDate > latestDate) {
+        latestDate = endDate;
+      }
+      
+      // 해당 과정의 모든 운영 월 수집
+      Object.keys(programInfo.monthly_data || {}).forEach(monthKey => {
+        const revenue = programInfo.monthly_data[monthKey];
+        if (revenue > 0) { // 데이터가 있는 월만 포함
+          allMonths.add(monthKey);
+        }
+      });
+    });
+    
+    // 시간 순으로 정렬된 월 배열 생성
+    const sortedMonths = Array.from(allMonths).sort();
+    
+    return {
+      earliestDate,
+      latestDate,
+      months: sortedMonths
+    };
+  }
+
+  // 월별 매출 차트 데이터 가공 함수 (동적 기간 지원)
   function processYearlyMonthlyRevenueData(data, targetYear, selectedPrograms = []) {
     const monthlyTotals = data?.monthly_totals || {};
     const programsData = data?.programs_data || {};
     
-    const labels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-    
-    // 선택된 과정이 없으면 전체 데이터 반환
+    // 선택된 과정이 없으면 전체 데이터 반환 (기존 방식)
     if (!selectedPrograms || selectedPrograms.length === 0) {
+      const labels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
       return {
         labels: labels,
         datasets: [{
@@ -206,7 +249,16 @@
       };
     }
     
-    // 선택된 과정들에 대한 개별 라인 생성
+    // 선택된 과정들의 운영 기간 분석
+    const periodInfo = analyzeProgramsPeriod(programsData, selectedPrograms);
+    if (!periodInfo || periodInfo.months.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+    
+    // YYYY-MM 형식의 라벨 생성
+    const labels = periodInfo.months;
+    
+    // 색상 팔레트
     const colors = [
       'rgba(59, 130, 246, 1)',    // 파랑
       'rgba(16, 185, 129, 1)',    // 초록
@@ -220,17 +272,20 @@
       'rgba(168, 85, 247, 1)'     // 인디고
     ];
     
+    // 선택된 과정들에 대한 개별 라인 생성
     const datasets = selectedPrograms.map((programName, index) => {
-      const programMonthly = programsData[programName] || {};
+      const programInfo = programsData[programName];
+      if (!programInfo) return null;
+      
       const color = colors[index % colors.length];
+      const monthlyData = programInfo.monthly_data || {};
+      
+      // 각 월에 대한 데이터 매핑
+      const data = labels.map(monthKey => monthlyData[monthKey] || 0);
       
       return {
         label: programName,
-        data: [
-          programMonthly[1] || 0, programMonthly[2] || 0, programMonthly[3] || 0, programMonthly[4] || 0,
-          programMonthly[5] || 0, programMonthly[6] || 0, programMonthly[7] || 0, programMonthly[8] || 0,
-          programMonthly[9] || 0, programMonthly[10] || 0, programMonthly[11] || 0, programMonthly[12] || 0
-        ],
+        data: data,
         borderColor: color,
         backgroundColor: color.replace('1)', '0.1)'),
         borderWidth: 2,
@@ -242,7 +297,7 @@
         pointRadius: 4,
         pointHoverRadius: 6
       };
-    });
+    }).filter(dataset => dataset !== null);
     
     return {
       labels: labels,
@@ -312,6 +367,7 @@
             }
           },
           y: {
+            beginAtZero: true,
             grid: {
               color: 'rgba(148, 163, 184, 0.1)'
             },

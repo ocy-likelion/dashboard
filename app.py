@@ -1335,7 +1335,7 @@ def create_app() -> Flask:
                             'expected': expected_revenue
                         })
 
-            # 과정별 데이터도 함께 반환
+            # 과정별 데이터도 함께 반환 (실제 운영 기간 기준)
             programs_data = {}
             for p in programs:
                 pid = int(p.get('id', 0))
@@ -1352,49 +1352,54 @@ def create_app() -> Flask:
                 if not (start_dt and end_dt):
                     continue
                 
-                program_monthly = {}
-                for month in range(1, 13):
-                    program_monthly[month] = 0
-                    
-                    window_start = month_start(year, month)
-                    window_end = month_end(year, month)
-                    
-                    # 해당 월과 과정 기간이 겹치는지 확인
-                    if end_dt < window_start or start_dt > window_end:
-                        continue
-                    
-                    # N개월차 계산
-                    month_index = None
-                    cursor_date = start_dt
-                    idx = 1
-                    while cursor_date <= end_dt:
-                        next_month = cursor_date.replace(day=28) + timedelta(days=4)
-                        next_month = next_month.replace(day=1)
-                        month_end_cursor = min(next_month - timedelta(days=1), end_dt)
-                        
-                        if window_start <= month_end_cursor and cursor_date <= window_end:
-                            month_index = idx
-                            break
-                        
-                        cursor_date = next_month
-                        idx += 1
-                    
-                    if month_index is None:
-                        continue
-                    
-                    # 해당 개월차의 시간/인원 데이터 가져오기
-                    month_key = f"{month_index}M"
-                    hours_data = hours_map.get(pid, {})
-                    enroll_data = enroll_map.get(pid, {})
-                    
-                    hours = parse_int(hours_data.get(month_key, 0))
-                    enrollments = parse_int(enroll_data.get(month_key, 0))
-                    
-                    if hours > 0 and enrollments > 0:
-                        expected_revenue = hours * enrollments * 18150
-                        program_monthly[month] = expected_revenue
+                # 실제 운영 월만 계산 (YYYY-MM 형식)
+                program_monthly_data = {}
                 
-                programs_data[program_key] = program_monthly
+                # 과정 운영 기간의 모든 월을 순회
+                cursor_date = start_dt
+                month_idx = 1
+                
+                while cursor_date <= end_dt:
+                    # 현재 월의 시작/끝 날짜
+                    current_month_start = cursor_date.replace(day=1)
+                    if cursor_date.month == 12:
+                        next_month_start = cursor_date.replace(year=cursor_date.year + 1, month=1, day=1)
+                    else:
+                        next_month_start = cursor_date.replace(month=cursor_date.month + 1, day=1)
+                    current_month_end = next_month_start - timedelta(days=1)
+                    
+                    # 실제 과정 기간과 겹치는 부분만 계산
+                    actual_start = max(cursor_date, start_dt)
+                    actual_end = min(current_month_end, end_dt)
+                    
+                    if actual_start <= actual_end:
+                        # YYYY-MM 형식의 키 생성
+                        month_key_str = cursor_date.strftime('%Y-%m')
+                        
+                        # N개월차 데이터 가져오기
+                        month_data_key = f"{month_idx}M"
+                        hours_data = hours_map.get(pid, {})
+                        enroll_data = enroll_map.get(pid, {})
+                        
+                        hours = parse_int(hours_data.get(month_data_key, 0))
+                        enrollments = parse_int(enroll_data.get(month_data_key, 0))
+                        
+                        if hours > 0 and enrollments > 0:
+                            expected_revenue = hours * enrollments * 18150
+                            program_monthly_data[month_key_str] = expected_revenue
+                        else:
+                            # 데이터가 없는 경우 0으로 설정 (나중에 프론트엔드에서 필터링)
+                            program_monthly_data[month_key_str] = 0
+                    
+                    # 다음 월로 이동
+                    cursor_date = next_month_start
+                    month_idx += 1
+                
+                programs_data[program_key] = {
+                    'start_date': start_dt.isoformat(),
+                    'end_date': end_dt.isoformat(),
+                    'monthly_data': program_monthly_data
+                }
 
             return jsonify({
                 'year': year,
