@@ -370,6 +370,10 @@
         };
         Object.keys(map).forEach(k=>{ const el = form.querySelector(`[name="${k}"]`); if(el) el.value = map[k]; });
       }
+      
+      // 월별 데이터 입력 필드 생성
+      this.initializeMonthlyInputs(program);
+      
       document.getElementById('programModal').classList.remove('hidden');
       document.getElementById('programModal').setAttribute('aria-hidden','false');
     }
@@ -380,9 +384,172 @@
       this._editingProgram = null;
     }
 
+    // 월별 입력 필드 초기화
+    initializeMonthlyInputs(program) {
+      const toggleBtn = document.getElementById('toggleMonthlyData');
+      const monthlyContent = document.getElementById('monthlyDataContent');
+      const startInput = document.querySelector('[name="개강일"]');
+      const endInput = document.querySelector('[name="종강일"]');
+      
+      // 토글 버튼 이벤트
+      toggleBtn.onclick = () => {
+        const isHidden = monthlyContent.classList.contains('hidden');
+        monthlyContent.classList.toggle('hidden', !isHidden);
+        toggleBtn.classList.toggle('expanded', isHidden);
+        toggleBtn.innerHTML = `<i class="fa-solid fa-chevron-down"></i> ${isHidden ? '상세 입력 닫기' : '상세 입력'}`;
+      };
+      
+      // 개강/종강일 변경 시 월별 필드 업데이트
+      const updateMonthlyFields = () => {
+        this.generateMonthlyFields(startInput.value, endInput.value, program?.id);
+      };
+      
+      startInput.addEventListener('change', updateMonthlyFields);
+      endInput.addEventListener('change', updateMonthlyFields);
+      
+      // 초기 로드
+      if (program && startInput.value && endInput.value) {
+        updateMonthlyFields();
+      }
+    }
+
+    // 월별 입력 필드 생성
+    generateMonthlyFields(startDate, endDate, programId) {
+      const container = document.getElementById('monthlyInputs');
+      container.innerHTML = '';
+      
+      if (!startDate || !endDate) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); font-style: italic;">개강일과 종강일을 입력해 주세요.</p>';
+        return;
+      }
+      
+      try {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (start >= end) {
+          container.innerHTML = '<p style="text-align: center; color: var(--danger); font-style: italic;">종강일이 개강일보다 빨라야 합니다.</p>';
+          return;
+        }
+        
+        const months = this.calculateMonthsBetween(start, end);
+        
+        months.forEach((monthInfo, index) => {
+          const monthIndex = index + 1;
+          const monthGroup = this.createMonthInputGroup(monthIndex, monthInfo, programId);
+          container.appendChild(monthGroup);
+        });
+        
+        // 기존 데이터 로드
+        if (programId) {
+          this.loadExistingMonthlyData(programId);
+        }
+        
+      } catch (error) {
+        container.innerHTML = '<p style="text-align: center; color: var(--danger); font-style: italic;">날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)</p>';
+      }
+    }
+
+    // 두 날짜 사이의 월 계산
+    calculateMonthsBetween(start, end) {
+      const months = [];
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+      
+      while (current <= endMonth) {
+        months.push({
+          year: current.getFullYear(),
+          month: current.getMonth() + 1,
+          display: `${current.getFullYear()}년 ${current.getMonth() + 1}월`
+        });
+        current.setMonth(current.getMonth() + 1);
+      }
+      
+      return months;
+    }
+
+    // 월별 입력 그룹 생성
+    createMonthInputGroup(monthIndex, monthInfo, programId) {
+      const group = document.createElement('div');
+      group.className = 'monthly-input-group';
+      group.innerHTML = `
+        <div class="monthly-input-header">
+          <span class="month-badge">${monthIndex}M</span>
+          ${monthInfo.display}
+        </div>
+        <div class="monthly-input-fields">
+          <div class="monthly-input-field">
+            <label>수강 인원</label>
+            <input type="number" name="monthly_enrollment_${monthIndex}" min="0" placeholder="0" />
+          </div>
+          <div class="monthly-input-field">
+            <label>교육 시간</label>
+            <input type="number" name="monthly_hours_${monthIndex}" min="0" placeholder="0" />
+          </div>
+        </div>
+      `;
+      return group;
+    }
+
+    // 기존 월별 데이터 로드
+    async loadExistingMonthlyData(programId) {
+      try {
+        const [hoursRes, enrollRes] = await Promise.allSettled([
+          fetch(`/api/programs/${programId}/monthly-hours`),
+          fetch(`/api/programs/${programId}/monthly-enrollments`)
+        ]);
+        
+        let hoursData = {};
+        let enrollData = {};
+        
+        if (hoursRes.status === 'fulfilled' && hoursRes.value.ok) {
+          hoursData = await hoursRes.value.json();
+        }
+        
+        if (enrollRes.status === 'fulfilled' && enrollRes.value.ok) {
+          enrollData = await enrollRes.value.json();
+        }
+        
+        // 입력 필드에 데이터 채우기
+        Object.keys(hoursData).forEach(key => {
+          if (key !== 'id') {
+            const monthMatch = key.match(/(\d+)M/);
+            if (monthMatch) {
+              const monthIndex = monthMatch[1];
+              const input = document.querySelector(`[name="monthly_hours_${monthIndex}"]`);
+              if (input) input.value = hoursData[key] || '';
+            }
+          }
+        });
+        
+        Object.keys(enrollData).forEach(key => {
+          if (key !== 'id') {
+            const monthMatch = key.match(/(\d+)M/);
+            if (monthMatch) {
+              const monthIndex = monthMatch[1];
+              const input = document.querySelector(`[name="monthly_enrollment_${monthIndex}"]`);
+              if (input) input.value = enrollData[key] || '';
+            }
+          }
+        });
+        
+      } catch (error) {
+        console.error('월별 데이터 로드 오류:', error);
+      }
+    }
+
     async saveProgram(){
       const form = document.getElementById('programForm');
-      const data = Object.fromEntries(new FormData(form).entries());
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      
+      // 월별 데이터 수집
+      const monthlyData = this.collectMonthlyData();
+      if (monthlyData) {
+        data.monthly_hours = monthlyData.hours;
+        data.monthly_enrollments = monthlyData.enrollments;
+      }
+      
       const body = JSON.stringify(data);
       try{
         let res;
@@ -404,6 +571,39 @@
         console.error(err);
         this.showToast('저장 중 오류가 발생했습니다.', true);
       }
+    }
+
+    // 월별 데이터 수집
+    collectMonthlyData() {
+      const hoursInputs = document.querySelectorAll('[name^="monthly_hours_"]');
+      const enrollInputs = document.querySelectorAll('[name^="monthly_enrollment_"]');
+      
+      if (hoursInputs.length === 0 && enrollInputs.length === 0) {
+        return null; // 월별 데이터가 없음
+      }
+      
+      const hours = {};
+      const enrollments = {};
+      
+      hoursInputs.forEach(input => {
+        const match = input.name.match(/monthly_hours_(\d+)/);
+        if (match) {
+          const monthIndex = match[1];
+          const value = parseInt(input.value) || 0;
+          hours[`${monthIndex}M`] = value;
+        }
+      });
+      
+      enrollInputs.forEach(input => {
+        const match = input.name.match(/monthly_enrollment_(\d+)/);
+        if (match) {
+          const monthIndex = match[1];
+          const value = parseInt(input.value) || 0;
+          enrollments[`${monthIndex}M`] = value;
+        }
+      });
+      
+      return { hours, enrollments };
     }
 
     async deleteProgram(){

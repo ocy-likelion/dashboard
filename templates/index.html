@@ -184,6 +184,28 @@
               <label>취업산정제외인원<input name="취업산정제외인원" type="number" /></label>
               <label>만족도(0~5)<input name="HRD_만족도" type="number" step="0.01" min="0" max="5" /></label>
             </div>
+            
+            <!-- 월별 데이터 입력 섹션 -->
+            <div class="monthly-data-section">
+              <div class="monthly-header">
+                <h4 class="monthly-title">
+                  <i class="fa-solid fa-calendar-alt"></i>
+                  월별 수강 데이터
+                </h4>
+                <button type="button" class="btn secondary" id="toggleMonthlyData">
+                  <i class="fa-solid fa-chevron-down"></i>
+                  상세 입력
+                </button>
+              </div>
+              <div class="monthly-content hidden" id="monthlyDataContent">
+                <div class="monthly-info">
+                  <p><i class="fa-solid fa-info-circle"></i> 개강일과 종강일을 먼저 입력하면 월별 입력 필드가 자동으로 생성됩니다.</p>
+                </div>
+                <div class="monthly-inputs" id="monthlyInputs">
+                  <!-- 동적으로 생성될 월별 입력 필드들 -->
+                </div>
+              </div>
+            </div>
           </form>
         </div>
         <footer class="modal-footer">

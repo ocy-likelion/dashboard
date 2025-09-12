@@ -299,6 +299,45 @@ def create_app() -> Flask:
     def index():
         return render_template('index.html')
 
+    # 월별 데이터 조회 API
+    @app.get('/api/programs/<int:pid>/monthly-hours')
+    def get_monthly_hours(pid: int):
+        try:
+            conn = get_db_connection()
+            cur = conn.execute("SELECT * FROM kdt_monthly_hours WHERE id = ?", (pid,))
+            row = cur.fetchone()
+            if row:
+                return jsonify(dict(row))
+            else:
+                return jsonify({})
+        except Exception as e:
+            print(f"Error getting monthly hours: {e}")
+            return jsonify({})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    @app.get('/api/programs/<int:pid>/monthly-enrollments')
+    def get_monthly_enrollments(pid: int):
+        try:
+            conn = get_db_connection()
+            cur = conn.execute("SELECT * FROM kdt_monthly_enrollments WHERE id = ?", (pid,))
+            row = cur.fetchone()
+            if row:
+                return jsonify(dict(row))
+            else:
+                return jsonify({})
+        except Exception as e:
+            print(f"Error getting monthly enrollments: {e}")
+            return jsonify({})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     # Filters
     @app.get('/api/filters/years')
     def get_years():
@@ -442,22 +481,55 @@ def create_app() -> Flask:
     def quote_ident(name: str) -> str:
         return '"' + str(name).replace('"', '""') + '"'
 
-    def quote_ident(name: str) -> str:
-        # SQLite identifier quoting for names with spaces/special chars
-        return '"' + str(name).replace('"', '""') + '"'
+    # 월별 데이터 저장 함수
+    def save_monthly_data(conn: sqlite3.Connection, program_id: int, hours_data: dict, enrollments_data: dict):
+        try:
+            # 기존 데이터 삭제
+            conn.execute("DELETE FROM kdt_monthly_hours WHERE id = ?", (program_id,))
+            conn.execute("DELETE FROM kdt_monthly_enrollments WHERE id = ?", (program_id,))
+            
+            # 새 데이터 삽입
+            if hours_data:
+                hours_cols = ['id'] + list(hours_data.keys())
+                hours_vals = [program_id] + list(hours_data.values())
+                hours_placeholders = ','.join(['?'] * len(hours_vals))
+                hours_sql = f"INSERT OR REPLACE INTO kdt_monthly_hours ({','.join([quote_ident(c) for c in hours_cols])}) VALUES ({hours_placeholders})"
+                conn.execute(hours_sql, hours_vals)
+            
+            if enrollments_data:
+                enroll_cols = ['id'] + list(enrollments_data.keys())
+                enroll_vals = [program_id] + list(enrollments_data.values())
+                enroll_placeholders = ','.join(['?'] * len(enroll_vals))
+                enroll_sql = f"INSERT OR REPLACE INTO kdt_monthly_enrollments ({','.join([quote_ident(c) for c in enroll_cols])}) VALUES ({enroll_placeholders})"
+                conn.execute(enroll_sql, enroll_vals)
+            
+            conn.commit()
+        except Exception as e:
+            print(f"Error saving monthly data: {e}")
+            conn.rollback()
 
     @app.post('/api/programs')
     def create_program():
         try:
             conn = get_db_connection()
             payload = request.get_json(force=True, silent=True) or {}
+            
+            # 월별 데이터 분리
+            monthly_hours = payload.pop('monthly_hours', None)
+            monthly_enrollments = payload.pop('monthly_enrollments', None)
+            
             data = normalize_payload(payload, conn)
             cols = [k for k in data.keys() if k != 'id']
             placeholders = ','.join(['?'] * len(cols))
             sql = f"INSERT INTO kdt_programs ({','.join([quote_ident(c) for c in cols])}) VALUES ({placeholders})"
             cur = conn.execute(sql, [data[c] for c in cols])
+            program_id = cur.lastrowid
             conn.commit()
-            return jsonify({"id": cur.lastrowid, "success": True, "message": "생성되었습니다."})
+            
+            # 월별 데이터 저장
+            save_monthly_data(conn, program_id, monthly_hours, monthly_enrollments)
+            
+            return jsonify({"id": program_id, "success": True, "message": "생성되었습니다."})
         except Exception as e:
             print(e)
             return jsonify({"id": None, "success": False, "message": str(e)})
@@ -472,6 +544,11 @@ def create_app() -> Flask:
         try:
             conn = get_db_connection()
             payload = request.get_json(force=True, silent=True) or {}
+            
+            # 월별 데이터 분리
+            monthly_hours = payload.pop('monthly_hours', None)
+            monthly_enrollments = payload.pop('monthly_enrollments', None)
+            
             data = normalize_payload(payload, conn)
             if not data:
                 return jsonify({"id": pid, "success": False, "message": "업데이트할 데이터가 없습니다."})
@@ -480,6 +557,10 @@ def create_app() -> Flask:
             params = [data[k] for k in data.keys() if k != 'id'] + [pid]
             conn.execute(sql, params)
             conn.commit()
+            
+            # 월별 데이터 저장 (기존 데이터 대체)
+            save_monthly_data(conn, pid, monthly_hours, monthly_enrollments)
+            
             return jsonify({"id": pid, "success": True, "message": "수정되었습니다."})
         except Exception as e:
             print(e)

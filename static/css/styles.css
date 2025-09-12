@@ -820,6 +820,149 @@ input[type="text"]:focus, input[type="number"]:focus{
   box-shadow: var(--shadow-sm);
 }
 
+/* 월별 데이터 입력 섹션 */
+.monthly-data-section {
+  margin-top: 2rem;
+  border-top: 1px solid var(--border-light);
+  padding-top: 1.5rem;
+}
+
+.monthly-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.monthly-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monthly-title i {
+  color: var(--primary);
+}
+
+.monthly-content {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: 1.5rem;
+  border: 1px solid var(--border-light);
+}
+
+.monthly-content.hidden {
+  display: none;
+}
+
+.monthly-info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.monthly-info p {
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monthly-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.monthly-input-group {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+}
+
+.monthly-input-header {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monthly-input-header .month-badge {
+  background: var(--primary);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--border-radius);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.monthly-input-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.monthly-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.monthly-input-field label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.monthly-input-field input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.monthly-input-field input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+#toggleMonthlyData {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+#toggleMonthlyData.expanded i {
+  transform: rotate(180deg);
+}
+
+.btn.secondary {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+.btn.secondary:hover {
+  background: var(--border-light);
+  color: var(--text-primary);
+}
+
 /* 반응형 디자인 */
 @media (max-width: 1200px) {
   .chart-header {
