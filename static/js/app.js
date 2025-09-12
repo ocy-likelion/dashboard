@@ -197,7 +197,7 @@
         const kpiRes = await fetch(`/api/dashboard/kpi?${params.toString()}`);
         const kpis = await kpiRes.json();
         renderKpiCards(document.getElementById('dashboard-kpis'), [
-          {label:'모집률', value: (kpis['모집률']||0).toFixed(2)+'%'},
+          {label:'모객율', value: (kpis['모집률']||0).toFixed(2)+'%'},
           {label:'취업률', value: (kpis['취업률']||0).toFixed(2)+'%'},
           {label:'만족도', value: (kpis['만족도']||0).toFixed(2)},
           {label:'수료율', value: (kpis['수료율']||0).toFixed(2)+'%'}
@@ -219,12 +219,12 @@
         const labels = data.map(d=>d.quarter);
         const datasets = [];
         const palette = {
-          '모집률': '#4f46e5',
+          '모객율': '#4f46e5',
           '취업률': '#059669',
           '만족도': '#f59e0b',
           '수료율': '#ef4444'
         };
-        const keys = metric ? [metric] : ['모집률','취업률','만족도','수료율'];
+        const keys = metric ? [metric] : ['모객율','취업률','만족도','수료율'];
         keys.forEach(k=>{
           datasets.push({
             label: k,

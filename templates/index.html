@@ -73,6 +73,28 @@
 
       <section id="business-tab" class="tab-content">
         <div class="cards" id="business-kpis"></div>
+        
+        <!-- 월별 매출 차트 컴테이너 -->
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3 class="chart-title">📈 월별 예상 매출 추이</h3>
+            <div class="chart-controls">
+              <div class="filter-group">
+                <label class="filter-label">
+                  <i class="fa-solid fa-filter"></i>
+                  과정 선택
+                </label>
+                <select id="courseFilter" class="course-filter" multiple>
+                  <option value="">전체 과정</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="monthlyRevenueChart"></canvas>
+          </div>
+        </div>
+        
         <div class="toolbar" id="business-quarter">
           <select id="quarterFilter" class="dropdown-toggle">
             <option value="">전체 분기</option>
@@ -110,27 +132,6 @@
           </div>
         </div>
         <div id="monthly-expected"></div>
-        
-        <!-- 월별 매출 차트 컨테이너 -->
-        <div class="chart-container">
-          <div class="chart-header">
-            <h3 class="chart-title">📈 월별 예상 매출 추이</h3>
-            <div class="chart-controls">
-              <div class="filter-group">
-                <label class="filter-label">
-                  <i class="fa-solid fa-filter"></i>
-                  과정 선택
-                </label>
-                <select id="courseFilter" class="course-filter" multiple>
-                  <option value="">전체 과정</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="chart-wrapper">
-            <canvas id="monthlyRevenueChart"></canvas>
-          </div>
-        </div>
       </section>
 
 
