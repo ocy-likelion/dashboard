@@ -91,28 +91,22 @@
             const res = await fetch(`/api/business/monthly-expected?${q.toString()}`);
             const out = await res.json();
             renderMonthlyExpectedTable(document.getElementById('monthly-expected'), out.items||[]);
+            
+            // 과정 필터 변경 시 차트도 새로고침
+            await this.loadYearlyMonthlyChart(y);
           }catch(err){ console.error(err); }
         });
       }
-
-      // Business monthly revenue progression
-      const btnProgression = document.getElementById('btnLoadProgression');
-      if(btnProgression){
-        btnProgression.addEventListener('click', async ()=>{
-          try{
-            const y = document.getElementById('progressionYear').value || (this.state.year || '2025');
-            const like = (document.getElementById('progressionProgramLike').value||'').trim();
-            const q = new URLSearchParams();
-            q.set('year', y);
-            if(like) q.set('program_like', like);
-            const res = await fetch(`/api/business/monthly-revenue-progression?${q.toString()}`);
-            const data = await res.json();
-            
-            this.renderProgressionChart(data);
-            this.renderProgressionDetails(data);
-          }catch(err){ 
-            console.error('Error loading progression:', err); 
-            this.showToast('데이터 로딩 중 오류가 발생했습니다.', true);
+      
+      // 과정별 차트 필터 이벤트
+      const courseFilter = document.getElementById('courseFilter');
+      if(courseFilter){
+        courseFilter.addEventListener('change', () => {
+          if (this._chartData && this._chartYear) {
+            const selectedPrograms = window.getSelectedPrograms ? window.getSelectedPrograms() : [];
+            if (window.renderMonthlyRevenueChart) {
+              window.renderMonthlyRevenueChart(this._chartData, this._chartYear, selectedPrograms);
+            }
           }
         });
       }
@@ -294,13 +288,45 @@
         }
         applyFilter();
 
-        // Monthly revenue (optional view): can be toggled or rendered below table
-        // const m = await (await fetch(`/api/business/monthly-revenue?year=${encodeURIComponent(y)}`)).json();
-        // TODO: attach a chart/table using m.months and m.items if needed
+        // 연도별 12개월 매출 차트 로드
+        await this.loadYearlyMonthlyChart(y);
       }catch(err){ console.error(err); }
     }
 
-    // Performance removed
+    // 연도별 12개월 매출 차트 로드
+    async loadYearlyMonthlyChart(year) {
+      try {
+        const params = new URLSearchParams();
+        params.set('year', year);
+        
+        // 과정 필터가 있다면 적용 (옵션)
+        const programLike = document.getElementById('monthlyProgramLike')?.value?.trim();
+        if (programLike) {
+          params.set('program_like', programLike);
+        }
+        
+        const res = await fetch(`/api/business/yearly-monthly-revenue?${params.toString()}`);
+        const data = await res.json();
+        
+        // 과정 필터 드롭다운 업데이트
+        if (window.updateCourseFilter && data.programs_list) {
+          window.updateCourseFilter(data.programs_list);
+        }
+        
+        // 선택된 과정들 가져오기
+        const selectedPrograms = window.getSelectedPrograms ? window.getSelectedPrograms() : [];
+        
+        if (window.renderMonthlyRevenueChart) {
+          window.renderMonthlyRevenueChart(data, year, selectedPrograms);
+        }
+        
+        // 차트 데이터를 전역에 저장 (필터 변경 시 재사용)
+        this._chartData = data;
+        this._chartYear = year;
+      } catch (err) {
+        console.error('차트 로드 오류:', err);
+      }
+    }
 
     // Programs
     async updatePrograms(){
@@ -409,134 +435,6 @@
       t.classList.toggle('error', !!isError);
       t.classList.remove('hidden');
       setTimeout(()=> t.classList.add('hidden'), 1800);
-    }
-
-    renderProgressionChart(data){
-      const chartWrap = document.getElementById('progression-chart-wrap');
-      const canvas = document.getElementById('progressionChart');
-      
-      if(!data.monthly_totals || data.monthly_totals.length === 0){
-        chartWrap.style.display = 'none';
-        return;
-      }
-
-      chartWrap.style.display = 'block';
-
-      // Destroy existing chart
-      if(window.progressionChartInstance){
-        window.progressionChartInstance.destroy();
-      }
-
-      const ctx = canvas.getContext('2d');
-      const months = data.monthly_totals.map(item => item.month);
-      const revenues = data.monthly_totals.map(item => item.total_revenue);
-
-      window.progressionChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: months,
-          datasets: [{
-            label: '월별 실 매출 (등차수열 기반)',
-            data: revenues,
-            borderColor: 'rgb(37, 99, 235)',
-            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            pointBackgroundColor: 'rgb(37, 99, 235)',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            pointRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top'
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `매출: ${formatCurrency(context.parsed.y)}`;
-                }
-              }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return formatCurrency(value);
-                }
-              }
-            },
-            x: {
-              title: {
-                display: true,
-                text: '월'
-              }
-            }
-          }
-        }
-      });
-    }
-
-    renderProgressionDetails(data){
-      const container = document.getElementById('progression-details');
-      
-      if(!data.programs || data.programs.length === 0){
-        container.innerHTML = '<p style="text-align:center; color:#6b7280; padding:20px;">데이터가 없습니다.</p>';
-        return;
-      }
-
-      let html = `
-        <div class="progression-summary" style="background: var(--panel); border-radius: 16px; padding: 20px; margin: 20px 0; box-shadow: var(--shadow-md);">
-          <h3 style="margin: 0 0 16px 0; color: var(--text);">등차수열 매출 분석 요약</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-            <div><strong>총 매출:</strong> ${formatCurrency(data.grand_total)}</div>
-            <div><strong>분석 과정 수:</strong> ${data.programs.length}개</div>
-            <div><strong>연도:</strong> ${data.year || '전체'}</div>
-            ${data.program_filter ? `<div><strong>필터:</strong> ${data.program_filter}</div>` : ''}
-          </div>
-        </div>
-        
-        <div class="progression-programs" style="background: var(--panel); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-md);">
-          <h4 style="margin: 0 0 16px 0; color: var(--text);">과정별 상세 분석</h4>
-      `;
-
-      data.programs.forEach(program => {
-        html += `
-          <div class="program-detail" style="border: 1px solid rgba(226, 232, 240, 0.8); border-radius: 12px; padding: 16px; margin: 12px 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h5 style="margin: 0; color: var(--text);">${program.program} (${program.round}회차)</h5>
-              <span style="font-weight: bold; color: var(--primary);">${formatCurrency(program.total_revenue)}</span>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 14px; color: var(--muted);">
-              <div>확정인원: ${program.confirmed}명</div>
-              <div>수료인원: ${program.completed}명</div>
-              <div>진행기간: ${program.duration_months}개월</div>
-              <div>월감소율: ${program.decline_per_month}명/월</div>
-            </div>
-            <div style="margin-top: 12px;">
-              <strong style="color: var(--text);">월별 변동:</strong>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-                ${program.monthly_data.map(month => 
-                  `<span style="background: var(--primary-50); padding: 4px 8px; border-radius: 8px; font-size: 12px;">
-                    ${month.month}: ${month.enrollment.toFixed(1)}명 → ${formatCurrency(month.revenue)}
-                  </span>`
-                ).join('')}
-              </div>
-            </div>
-          </div>
-        `;
-      });
-
-      html += '</div>';
-      container.innerHTML = html;
     }
   }
 

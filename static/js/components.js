@@ -179,13 +179,197 @@
     container.appendChild(table);
   }
 
-  // Format currency helper function
-  window.formatCurrency = function(amount) {
-    if (typeof amount !== 'number') {
-      amount = parseFloat(amount) || 0;
+  // 월별 매출 차트 데이터 가공 함수 (연도별 12개월 전체)
+  function processYearlyMonthlyRevenueData(data, targetYear, selectedPrograms = []) {
+    const monthlyTotals = data?.monthly_totals || {};
+    const programsData = data?.programs_data || {};
+    
+    const labels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+    
+    // 선택된 과정이 없으면 전체 데이터 반환
+    if (!selectedPrograms || selectedPrograms.length === 0) {
+      return {
+        labels: labels,
+        datasets: [{
+          label: `${targetYear}년 전체 과정`,
+          data: [
+            monthlyTotals[1] || 0, monthlyTotals[2] || 0, monthlyTotals[3] || 0, monthlyTotals[4] || 0,
+            monthlyTotals[5] || 0, monthlyTotals[6] || 0, monthlyTotals[7] || 0, monthlyTotals[8] || 0,
+            monthlyTotals[9] || 0, monthlyTotals[10] || 0, monthlyTotals[11] || 0, monthlyTotals[12] || 0
+          ],
+          borderColor: 'rgba(59, 130, 246, 1)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4
+        }]
+      };
     }
-    return amount.toLocaleString('ko-KR') + '원';
-  };
+    
+    // 선택된 과정들에 대한 개별 라인 생성
+    const colors = [
+      'rgba(59, 130, 246, 1)',    // 파랑
+      'rgba(16, 185, 129, 1)',    // 초록
+      'rgba(245, 101, 101, 1)',   // 빨강
+      'rgba(251, 191, 36, 1)',    // 노랑
+      'rgba(139, 92, 246, 1)',    // 보라
+      'rgba(236, 72, 153, 1)',    // 핑크
+      'rgba(6, 182, 212, 1)',     // 청록
+      'rgba(34, 197, 94, 1)',     // 라임
+      'rgba(239, 68, 68, 1)',     // 오렌지-빨강
+      'rgba(168, 85, 247, 1)'     // 인디고
+    ];
+    
+    const datasets = selectedPrograms.map((programName, index) => {
+      const programMonthly = programsData[programName] || {};
+      const color = colors[index % colors.length];
+      
+      return {
+        label: programName,
+        data: [
+          programMonthly[1] || 0, programMonthly[2] || 0, programMonthly[3] || 0, programMonthly[4] || 0,
+          programMonthly[5] || 0, programMonthly[6] || 0, programMonthly[7] || 0, programMonthly[8] || 0,
+          programMonthly[9] || 0, programMonthly[10] || 0, programMonthly[11] || 0, programMonthly[12] || 0
+        ],
+        borderColor: color,
+        backgroundColor: color.replace('1)', '0.1)'),
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointBackgroundColor: color,
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      };
+    });
+    
+    return {
+      labels: labels,
+      datasets: datasets
+    };
+  }
+
+  // Chart.js를 사용한 월별 매출 차트 렌더링
+  let monthlyRevenueChart = null;
+  
+  function renderMonthlyRevenueChart(data, year, selectedPrograms = []) {
+    const ctx = document.getElementById('monthlyRevenueChart');
+    if (!ctx) return;
+    
+    // 기존 차트 파괴
+    if (monthlyRevenueChart) {
+      monthlyRevenueChart.destroy();
+    }
+    
+    const chartData = processYearlyMonthlyRevenueData(data, year, selectedPrograms);
+    
+    monthlyRevenueChart = new Chart(ctx, {
+      type: 'line',
+      data: chartData,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: 'var(--text-primary)',
+              font: {
+                size: 12,
+                weight: '500'
+              }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y.toLocaleString('ko-KR')}원`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)'
+            },
+            ticks: {
+              color: 'var(--text-secondary)',
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: {
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)'
+            },
+            ticks: {
+              color: 'var(--text-secondary)',
+              font: {
+                size: 11
+              },
+              callback: function(value) {
+                return (value / 1000000).toFixed(0) + '백만원';
+              }
+            }
+          }
+        },
+        elements: {
+          point: {
+            hoverBackgroundColor: 'rgba(59, 130, 246, 1)'
+          }
+        }
+      }
+    });
+  }
+
+  // 과정 필터 드롭다운 업데이트
+  function updateCourseFilter(programsList) {
+    const courseFilter = document.getElementById('courseFilter');
+    if (!courseFilter) return;
+    
+    // 기존 옵션 제거 (첫 번째 "전체 과정" 옵션은 유지)
+    while (courseFilter.children.length > 1) {
+      courseFilter.removeChild(courseFilter.lastChild);
+    }
+    
+    // 새 과정 옵션 추가
+    programsList.forEach(program => {
+      const option = document.createElement('option');
+      option.value = program;
+      option.textContent = program;
+      courseFilter.appendChild(option);
+    });
+  }
+  
+  // 선택된 과정들 가져오기
+  function getSelectedPrograms() {
+    const courseFilter = document.getElementById('courseFilter');
+    if (!courseFilter) return [];
+    
+    const selected = Array.from(courseFilter.selectedOptions)
+      .map(option => option.value)
+      .filter(value => value !== ''); // 빈 값(전체 과정) 제외
+    
+    return selected;
+  }
+
+  // 전역 함수로 노출
+  window.renderMonthlyRevenueChart = renderMonthlyRevenueChart;
+  window.updateCourseFilter = updateCourseFilter;
+  window.getSelectedPrograms = getSelectedPrograms;
 })();
 
 

@@ -1223,127 +1223,190 @@ def create_app() -> Flask:
             except Exception:
                 pass
 
-    # New: Monthly revenue with arithmetic progression for enrollment decline
-    @app.get('/api/business/monthly-revenue-progression')
-    def business_monthly_revenue_progression():
+    # 새로운 API: 연도별 12개월 전체 예상 매출 데이터
+    @app.get('/api/business/yearly-monthly-revenue')
+    def business_yearly_monthly_revenue():
         try:
             conn = get_db_connection()
             mapping = get_schema_mapping(conn)
-            year = request.args.get('year') or '2025'
-            program_like = request.args.get('program_like', '').strip()
-            
-            year_col = mapping.get('year') or '년도'
+            year = int(request.args.get('year') or 2025)
+            program_like = request.args.get('program_like')
+
             name_col = mapping.get('name')
             round_col = mapping.get('batch') or '회차'
             start_col = mapping.get('start')
             end_col = mapping.get('end')
-            confirmed_col = mapping.get('confirmed')
-            completed_col = mapping.get('completed')
-            hours_col = '교육시간'
-            
-            # Build where clause
-            where = ''
-            params: List[Any] = []
-            if year and year.lower() != 'all' and year_col:
-                where = f"WHERE {year_col} = ?"
-                params.append(year)
-            
-            cur = conn.execute(f"SELECT * FROM kdt_programs {where}", params)
+
+            # load programs for the year
+            cur = conn.execute("SELECT * FROM kdt_programs")
             programs = [dict(r) for r in cur.fetchall()]
-            
-            # Filter by program name if specified
             if program_like and name_col:
-                programs = [p for p in programs if program_like in str(p.get(name_col, ''))]
+                needle = str(program_like).strip()
+                programs = [p for p in programs if needle in str(p.get(name_col, ''))]
+
+            # hours/enroll maps by id
+            hours_map: Dict[int, Dict[str, Any]] = {}
+            enroll_map: Dict[int, Dict[str, Any]] = {}
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_hours")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    hours_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+            try:
+                cur = conn.execute("SELECT * FROM kdt_monthly_enrollments")
+                for r in cur.fetchall():
+                    d = dict(r)
+                    enroll_map[int(d.get('id'))] = d
+            except Exception:
+                pass
+
+            # helpers
+            def month_start(y: int, m: int) -> date:
+                return date(y, m, 1)
+
+            def month_end(y: int, m: int) -> date:
+                if m == 12:
+                    return date(y, 12, 31)
+                return date(y, m+1, 1) - timedelta(days=1)
+
+            from datetime import timedelta
             
-            UNIT = 18150
-            result_items = []
-            total_monthly_revenue = {}
-            
-            for program in programs:
-                program_name = str(program.get(name_col) or program.get('과정명') or '').strip()
-                round_num = str(program.get(round_col) or '').strip()
-                start_date = safe_date(program.get(start_col))
-                end_date = safe_date(program.get(end_col))
-                confirmed = parse_int(program.get(confirmed_col)) if confirmed_col else 0
-                completed = parse_int(program.get(completed_col)) if completed_col else 0
-                hours = parse_int(program.get(hours_col))
+            # 12개월 전체 데이터 계산
+            monthly_revenue = {}
+            for month in range(1, 13):  # 1월~12월
+                monthly_revenue[month] = 0
                 
-                if not start_date or not end_date or confirmed <= 0 or hours <= 0:
+                window_start = month_start(year, month)
+                window_end = month_end(year, month)
+
+                items = []
+                for p in programs:
+                    pid = int(p.get('id', 0))
+                    program_name = str(p.get(name_col) or p.get('과정명') or '').strip()
+                    round_name = str(p.get(round_col) or '').strip()
+                    
+                    start_dt = safe_date(p.get(start_col)) if start_col else None
+                    end_dt = safe_date(p.get(end_col)) if end_col else None
+                    
+                    if not (start_dt and end_dt):
+                        continue
+                    
+                    # 해당 월과 과정 기간이 겹치는지 확인
+                    if end_dt < window_start or start_dt > window_end:
+                        continue
+                    
+                    # N개월차 계산
+                    month_index = None
+                    cursor_date = start_dt
+                    idx = 1
+                    while cursor_date <= end_dt:
+                        next_month = cursor_date.replace(day=28) + timedelta(days=4)
+                        next_month = next_month.replace(day=1)
+                        month_end_cursor = min(next_month - timedelta(days=1), end_dt)
+                        
+                        if window_start <= month_end_cursor and cursor_date <= window_end:
+                            month_index = idx
+                            break
+                        
+                        cursor_date = next_month
+                        idx += 1
+                    
+                    if month_index is None:
+                        continue
+                    
+                    # 해당 개월차의 시간/인원 데이터 가져오기
+                    month_key = f"{month_index}M"
+                    hours_data = hours_map.get(pid, {})
+                    enroll_data = enroll_map.get(pid, {})
+                    
+                    hours = parse_int(hours_data.get(month_key, 0))
+                    enrollments = parse_int(enroll_data.get(month_key, 0))
+                    
+                    if hours > 0 and enrollments > 0:
+                        expected_revenue = hours * enrollments * 18150
+                        monthly_revenue[month] += expected_revenue
+                        
+                        items.append({
+                            'program': program_name,
+                            'round': round_name,
+                            'monthIndex': month_index,
+                            'expected': expected_revenue
+                        })
+
+            # 과정별 데이터도 함께 반환
+            programs_data = {}
+            for p in programs:
+                pid = int(p.get('id', 0))
+                program_name = str(p.get(name_col) or p.get('과정명') or '').strip()
+                round_name = str(p.get(round_col) or '').strip()
+                program_key = f"{program_name} ({round_name}회차)" if round_name else program_name
+                
+                if not program_key or program_key in programs_data:
+                    continue
+                    
+                start_dt = safe_date(p.get(start_col)) if start_col else None
+                end_dt = safe_date(p.get(end_col)) if end_col else None
+                
+                if not (start_dt and end_dt):
                     continue
                 
-                # Calculate duration in months
-                duration_months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month) + 1
-                if duration_months <= 0:
-                    duration_months = 1
+                program_monthly = {}
+                for month in range(1, 13):
+                    program_monthly[month] = 0
+                    
+                    window_start = month_start(year, month)
+                    window_end = month_end(year, month)
+                    
+                    # 해당 월과 과정 기간이 겹치는지 확인
+                    if end_dt < window_start or start_dt > window_end:
+                        continue
+                    
+                    # N개월차 계산
+                    month_index = None
+                    cursor_date = start_dt
+                    idx = 1
+                    while cursor_date <= end_dt:
+                        next_month = cursor_date.replace(day=28) + timedelta(days=4)
+                        next_month = next_month.replace(day=1)
+                        month_end_cursor = min(next_month - timedelta(days=1), end_dt)
+                        
+                        if window_start <= month_end_cursor and cursor_date <= window_end:
+                            month_index = idx
+                            break
+                        
+                        cursor_date = next_month
+                        idx += 1
+                    
+                    if month_index is None:
+                        continue
+                    
+                    # 해당 개월차의 시간/인원 데이터 가져오기
+                    month_key = f"{month_index}M"
+                    hours_data = hours_map.get(pid, {})
+                    enroll_data = enroll_map.get(pid, {})
+                    
+                    hours = parse_int(hours_data.get(month_key, 0))
+                    enrollments = parse_int(enroll_data.get(month_key, 0))
+                    
+                    if hours > 0 and enrollments > 0:
+                        expected_revenue = hours * enrollments * 18150
+                        program_monthly[month] = expected_revenue
                 
-                # Calculate arithmetic progression
-                # a = (confirmed - completed) / duration_months
-                decline_per_month = (confirmed - completed) / duration_months
-                
-                monthly_data = []
-                current_date = start_date.replace(day=1)  # Start from first day of start month
-                
-                for month_idx in range(duration_months):
-                    # Calculate enrollment for this month using arithmetic sequence
-                    enrollment_this_month = confirmed - (month_idx * decline_per_month)
-                    
-                    # Ensure enrollment doesn't go below completed count
-                    if month_idx == duration_months - 1:
-                        enrollment_this_month = completed
-                    elif enrollment_this_month < completed:
-                        enrollment_this_month = completed
-                    
-                    # Calculate monthly revenue
-                    monthly_hours = hours / duration_months  # Distribute hours evenly
-                    monthly_revenue = int(round(enrollment_this_month * monthly_hours * UNIT))
-                    
-                    month_key = current_date.strftime('%Y-%m')
-                    monthly_data.append({
-                        'month': month_key,
-                        'enrollment': round(enrollment_this_month, 1),
-                        'hours': round(monthly_hours, 1),
-                        'revenue': monthly_revenue
-                    })
-                    
-                    # Add to total
-                    if month_key not in total_monthly_revenue:
-                        total_monthly_revenue[month_key] = 0
-                    total_monthly_revenue[month_key] += monthly_revenue
-                    
-                    # Move to next month
-                    if current_date.month == 12:
-                        current_date = current_date.replace(year=current_date.year + 1, month=1)
-                    else:
-                        current_date = current_date.replace(month=current_date.month + 1)
-                
-                result_items.append({
-                    'program': program_name,
-                    'round': round_num,
-                    'confirmed': confirmed,
-                    'completed': completed,
-                    'duration_months': duration_months,
-                    'decline_per_month': round(decline_per_month, 2),
-                    'monthly_data': monthly_data,
-                    'total_revenue': sum(item['revenue'] for item in monthly_data)
-                })
-            
-            # Convert total_monthly_revenue to sorted list
-            monthly_totals = [
-                {'month': month, 'total_revenue': revenue}
-                for month, revenue in sorted(total_monthly_revenue.items())
-            ]
-            
+                programs_data[program_key] = program_monthly
+
             return jsonify({
-                'year': year if year != 'all' else None,
-                'program_filter': program_like or None,
-                'monthly_totals': monthly_totals,
-                'programs': result_items,
-                'grand_total': sum(total_monthly_revenue.values())
+                'year': year,
+                'monthly_totals': monthly_revenue,
+                'programs_data': programs_data,
+                'programs_list': list(programs_data.keys()),
+                'items': []  # 차트용이므로 상세 아이템은 필요없음
             })
             
         except Exception as e:
-            print(f"Error in monthly revenue progression: {e}")
-            return jsonify({'error': str(e)}), 500
+            print(f"Error in yearly monthly revenue: {e}")
+            return jsonify({'year': year, 'monthly_totals': {}, 'items': []})
         finally:
             try:
                 conn.close()

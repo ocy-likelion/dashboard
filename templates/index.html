@@ -83,23 +83,54 @@
           </select>
         </div>
         <div id="business-table"></div>
-        <div class="toolbar" id="business-controls">
-          <input id="monthlyYear" type="number" placeholder="2025" style="width:120px" />
-          <input id="monthlyMonth" type="number" placeholder="7" min="1" max="12" style="width:80px" />
-          <input id="monthlyProgramLike" type="text" placeholder="과정 검색" style="width:200px" />
-          <button class="btn" id="btnLoadMonthly">월별 예상 매출 보기</button>
+        <div class="monthly-controls">
+          <div class="controls-header">
+            <h4 class="controls-title">
+              <i class="fa-solid fa-calendar-days"></i>
+              월별 예상 매출 조회
+            </h4>
+          </div>
+          <div class="controls-body">
+            <div class="input-group">
+              <label class="input-label">연도</label>
+              <input id="monthlyYear" type="number" placeholder="2025" class="form-input year-input" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">월</label>
+              <input id="monthlyMonth" type="number" placeholder="7" min="1" max="12" class="form-input month-input" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">과정 검색</label>
+              <input id="monthlyProgramLike" type="text" placeholder="과정명 입력..." class="form-input search-input" />
+            </div>
+            <button class="btn primary enhanced" id="btnLoadMonthly">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              조회하기
+            </button>
+          </div>
         </div>
         <div id="monthly-expected"></div>
         
-        <div class="toolbar" id="progression-controls">
-          <input id="progressionYear" type="number" placeholder="2025" style="width:120px" />
-          <input id="progressionProgramLike" type="text" placeholder="과정 검색" style="width:200px" />
-          <button class="btn primary" id="btnLoadProgression">등차수열 월별 매출 분석</button>
+        <!-- 월별 매출 차트 컨테이너 -->
+        <div class="chart-container">
+          <div class="chart-header">
+            <h3 class="chart-title">📈 월별 예상 매출 추이</h3>
+            <div class="chart-controls">
+              <div class="filter-group">
+                <label class="filter-label">
+                  <i class="fa-solid fa-filter"></i>
+                  과정 선택
+                </label>
+                <select id="courseFilter" class="course-filter" multiple>
+                  <option value="">전체 과정</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="monthlyRevenueChart"></canvas>
+          </div>
         </div>
-        <div class="chart-wrap" id="progression-chart-wrap" style="display:none;">
-          <canvas id="progressionChart" height="120"></canvas>
-        </div>
-        <div id="progression-details"></div>
       </section>
 
 

@@ -617,7 +617,228 @@ input[type="text"]:focus, input[type="number"]:focus{
 }
 
 /* Responsive */
-@media (max-width: 900px){
+/* 차트 컨테이너 스타일 */
+.chart-container {
+  background: var(--surface);
+  border-radius: var(--border-radius-lg);
+  padding: 0;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-light);
+  margin-top: 2rem;
+  overflow: hidden;
+}
+
+.chart-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.chart-title {
+  margin: 0;
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.filter-label i {
+  font-size: 0.8rem;
+}
+
+.course-filter {
+  min-width: 280px;
+  max-width: 350px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--border-radius);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+}
+
+.course-filter:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  background: white;
+}
+
+.course-filter option {
+  padding: 0.5rem;
+  background: white;
+  color: var(--text-primary);
+}
+
+.course-filter option:checked {
+  background: var(--primary);
+  color: white;
+}
+
+.chart-wrapper {
+  padding: 1.5rem;
+  background: var(--surface);
+}
+
+.chart-wrapper canvas {
+  height: 350px !important;
+  width: 100% !important;
+  border-radius: var(--border-radius);
+}
+
+/* 월별 조회 컨트롤 스타일 */
+.monthly-controls {
+  background: var(--surface);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  margin: 2rem 0;
+  overflow: hidden;
+}
+
+.controls-header {
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.controls-title {
+  margin: 0;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls-body {
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.form-input {
+  padding: 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: white;
+}
+
+.form-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.year-input {
+  width: 120px;
+}
+
+.month-input {
+  width: 80px;
+}
+
+.search-input {
+  width: 220px;
+}
+
+.btn.enhanced {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  transform: translateY(0);
+}
+
+.btn.enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn.enhanced:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1200px) {
+  .chart-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .chart-controls {
+    justify-content: center;
+  }
+  
+  .course-filter {
+    min-width: 250px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
   .sidebar{position:fixed; transform:translateX(0); z-index:20}
   .sidebar.collapsed{transform:translateX(-100%); width:240px}
   .main{margin-left:0; padding: 20px;}
@@ -625,6 +846,75 @@ input[type="text"]:focus, input[type="number"]:focus{
   .cards{grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:16px;}
   .kpi-value{font-size:20px;}
   .filterbar, .toolbar{padding: 12px 16px;}
+  
+  /* 월별 컨트롤 반응형 */
+  .controls-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .input-group {
+    width: 100%;
+  }
+  
+  .form-input {
+    width: 100% !important;
+  }
+  
+  .btn.enhanced {
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+  
+  /* 차트 헤더 모바일 */
+  .chart-title {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  
+  .filter-label {
+    font-size: 0.85rem;
+  }
+  
+  .course-filter {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .chart-container {
+    margin: 1rem 0;
+  }
+  
+  .chart-header {
+    padding: 1rem;
+  }
+  
+  .chart-wrapper {
+    padding: 1rem;
+  }
+  
+  .chart-wrapper canvas {
+    height: 280px !important;
+  }
+  
+  .monthly-controls {
+    margin: 1rem 0;
+  }
+  
+  .controls-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .controls-body {
+    padding: 1rem;
+  }
+  
+  .controls-title {
+    font-size: 1rem;
+  }
 }
 
 
