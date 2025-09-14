@@ -441,7 +441,7 @@ select:focus, .dropdown .dropdown-toggle:focus{
 /* Revenue table */
 .rev-row{
   display:grid; 
-  grid-template-columns:2fr 0.6fr 0.6fr 1fr 1fr 1fr 1fr; 
+  grid-template-columns:1fr 1.5fr 0.6fr 0.6fr 1fr 1fr 1fr 1fr; 
   gap:12px; 
   padding:16px 20px; 
   border-bottom:1px solid rgba(226, 232, 240, 0.6);
@@ -1039,6 +1039,17 @@ input[type="text"]:focus, input[type="number"]:focus{
     gap: 1rem;
   }
   
+  /* 매출 테이블 반응형 */
+  .rev-row {
+    grid-template-columns: 0.8fr 1.2fr 0.5fr 0.5fr 0.9fr 0.9fr 0.9fr 0.9fr;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  
+  .rev-col {
+    font-size: 13px;
+  }
+  
   .chart-controls {
     justify-content: center;
   }
@@ -1117,6 +1128,50 @@ input[type="text"]:focus, input[type="number"]:focus{
   
   .chart-header {
     padding: 1rem;
+  }
+  
+  /* 모바일 매출 테이블 */
+  .rev-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 16px;
+  }
+  
+  .rev-col {
+    font-size: 12px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  
+  .rev-col.head {
+    font-size: 11px;
+  }
+  
+  /* 모바일에서는 각 행을 카드 형태로 */
+  .rev-row:not(:first-child) {
+    display: block;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: var(--surface);
+  }
+  
+  .rev-row:not(:first-child) .rev-col {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.3);
+  }
+  
+  .rev-row:not(:first-child) .rev-col:last-child {
+    border-bottom: none;
+  }
+  
+  .rev-row:not(:first-child) .rev-col:before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 100px;
   }
   
   .chart-wrapper {

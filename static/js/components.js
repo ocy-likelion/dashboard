@@ -63,7 +63,7 @@
     const months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
     const header = el('div','timeline-header');
     // Add leading label header to align with rows' first column
-    const headLabel = el('div','timeline-label head','과정명');
+    const headLabel = el('div','timeline-label head','과정코드');
     header.appendChild(headLabel);
     months.forEach(m=> header.appendChild(el('div','timeline-col', `${m}월`)));
     container.appendChild(header);
@@ -85,7 +85,12 @@
         }
         row.appendChild(cell);
       });
-      const label = el('div','timeline-label', `${ev.name||''}`);
+      // 과정코드와 과정명을 함께 표시
+      const displayText = ev.course_code ? `${ev.course_code}` : (ev.name || '');
+      const label = el('div','timeline-label', displayText);
+      if (ev.course_code && ev.name) {
+        label.title = `과정명: ${ev.name}`; // 툴팁으로 과정명 표시
+      }
       row.prepend(label);
       body.appendChild(row);
     });
@@ -111,7 +116,13 @@
     (programs||[]).forEach(p => {
       const card = el('div','card program');
       const header = el('div','program-header');
-      header.appendChild(el('div','program-title', p['HRD_Net_과정명']||p['과정명']||'무제'));
+      
+      // 과정코드와 과정명을 함께 표시
+      const courseCode = p['과정코드'] || '';
+      const courseName = p['HRD_Net_과정명'] || p['과정명'] || '무제';
+      const titleText = courseCode ? `[${courseCode}] ${courseName}` : courseName;
+      
+      header.appendChild(el('div','program-title', titleText));
       header.appendChild(el('span','badge', p['진행상태']||''));
       const meta = el('div','program-meta');
       meta.appendChild(el('span','', `년도: ${p['년도']||''}`));
@@ -136,6 +147,7 @@
     container.innerHTML = '';
     const table = el('div','card');
     const header = el('div','rev-row');
+    header.appendChild(el('div','rev-col head','과정코드'));
     header.appendChild(el('div','rev-col head','과정명'));
     header.appendChild(el('div','rev-col head','회차'));
     header.appendChild(el('div','rev-col head','분기'));
@@ -146,13 +158,40 @@
     table.appendChild(header);
     (data||[]).forEach(it=>{
       const row = el('div','rev-row');
-      row.appendChild(el('div','rev-col', it.program||''));
-      row.appendChild(el('div','rev-col', String(it.round||'')));
-      row.appendChild(el('div','rev-col', String(it.quarter||'')));
-      row.appendChild(el('div','rev-col right', fmtWon(it.expected)));
-      row.appendChild(el('div','rev-col right', fmtWon(it.actual)));
-      row.appendChild(el('div','rev-col right', fmtWon(it.gap)));
-      row.appendChild(el('div','rev-col right', fmtWon(it.max)));
+      
+      // 모바일 라벨을 위한 data-label 속성 추가
+      const codeCol = el('div','rev-col', it.course_code||'');
+      codeCol.setAttribute('data-label', '과정코드');
+      row.appendChild(codeCol);
+      
+      const nameCol = el('div','rev-col', it.program||'');
+      nameCol.setAttribute('data-label', '과정명');
+      row.appendChild(nameCol);
+      
+      const roundCol = el('div','rev-col', String(it.round||''));
+      roundCol.setAttribute('data-label', '회차');
+      row.appendChild(roundCol);
+      
+      const quarterCol = el('div','rev-col', String(it.quarter||''));
+      quarterCol.setAttribute('data-label', '분기');
+      row.appendChild(quarterCol);
+      
+      const expectedCol = el('div','rev-col right', fmtWon(it.expected));
+      expectedCol.setAttribute('data-label', '예상 매출');
+      row.appendChild(expectedCol);
+      
+      const actualCol = el('div','rev-col right', fmtWon(it.actual));
+      actualCol.setAttribute('data-label', '실 매출');
+      row.appendChild(actualCol);
+      
+      const gapCol = el('div','rev-col right', fmtWon(it.gap));
+      gapCol.setAttribute('data-label', '차이');
+      row.appendChild(gapCol);
+      
+      const maxCol = el('div','rev-col right', fmtWon(it.max));
+      maxCol.setAttribute('data-label', '최대 가능');
+      row.appendChild(maxCol);
+      
       table.appendChild(row);
     });
     container.appendChild(table);

@@ -803,6 +803,7 @@ def create_app() -> Flask:
                 events.append({
                     'id': r.get('id'),
                     'name': r.get(mapping['name']),
+                    'course_code': r.get('과정코드') or '',
                     'team': r.get(mapping['team']),
                     'status': r.get(mapping['status']),
                     'category': r.get('과정구분') or r.get(mapping['team']),
@@ -933,6 +934,48 @@ def create_app() -> Flask:
             UNIT = 18150
             def to_int(v: Any) -> int:
                 return parse_int(v, 0)
+            
+            # 1. 전체 평균 수료율 계산 (종강 과정만 대상)
+            def calc_avg_graduation_rate():
+                total_confirmed = 0
+                total_completed = 0
+                total_excl = 0
+                
+                for grs in groups.values():
+                    for g in grs:
+                        status = str(g.get(mapping.get('status', '')) or '').strip()
+                        if status == '종강':  # 종강된 과정만 평균 계산에 포함
+                            total_confirmed += to_int(g.get(confirmed_col))
+                            total_completed += to_int(g.get(completed_col))
+                            total_excl += to_int(g.get(complete_excl_col))
+                
+                avg_denom = total_confirmed - total_excl
+                return (total_completed / avg_denom) if avg_denom > 0 else 0
+            
+            avg_graduation_rate = calc_avg_graduation_rate()
+            
+            # 2. 과정별 직전 회차 수료율 찾기 함수
+            def find_prev_round_graduation_rate(program: str, current_round: str):
+                try:
+                    current_round_num = int(current_round) if current_round.isdigit() else 0
+                    if current_round_num <= 1:
+                        return None  # 1회차이거나 숫자가 아니면 직전 회차 없음
+                    
+                    prev_round = str(current_round_num - 1)
+                    prev_key = (program, prev_round)
+                    
+                    if prev_key in groups:
+                        prev_grs = groups[prev_key]
+                        prev_confirmed = sum(to_int(g.get(confirmed_col)) for g in prev_grs)
+                        prev_completed = sum(to_int(g.get(completed_col)) for g in prev_grs)
+                        prev_excl = sum(to_int(g.get(complete_excl_col)) for g in prev_grs)
+                        
+                        prev_denom = prev_confirmed - prev_excl
+                        if prev_denom > 0:
+                            return prev_completed / prev_denom
+                    return None
+                except:
+                    return None
 
             items = []
             for (program, rnd), grs in groups.items():
@@ -942,11 +985,16 @@ def create_app() -> Flask:
                 excl_sum = sum(to_int(g.get(complete_excl_col)) for g in grs) if complete_excl_col else 0
                 hours_sum = sum(to_int(g.get(hours_col)) for g in grs)
 
-                # r: graduation rate based on current rule
-                denom = confirmed_sum - excl_sum
-                r = (completed_sum / denom) if denom > 0 else 0
-
-                expected = int(round(r * confirmed_sum * hours_sum * UNIT))
+                # 새로운 예상 매출 계산 로직
+                prev_rate = find_prev_round_graduation_rate(program, rnd)
+                if prev_rate is not None:
+                    # 직전 회차 수료율 사용
+                    graduation_rate = prev_rate
+                else:
+                    # 전체 평균 수료율 사용
+                    graduation_rate = avg_graduation_rate
+                
+                expected = int(round(graduation_rate * confirmed_sum * hours_sum * UNIT))
                 actual = int(round(completed_sum * hours_sum * UNIT))
                 maxrev = int(round(confirmed_sum * hours_sum * UNIT))
                 gap = expected - actual
@@ -961,8 +1009,12 @@ def create_app() -> Flask:
                         if dt and (best_dt is None or dt > best_dt):
                             best_dt = dt
 
+                # 과정코드 추가
+                course_code = str(grs[0].get('과정코드') or '').strip() if grs else ''
+                
                 items.append({
                     'program': program,
+                    'course_code': course_code,
                     'round': rnd,
                     'quarter': grs[0].get(quarter_col) if grs else None,
                     'expected': expected,
