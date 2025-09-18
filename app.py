@@ -232,9 +232,12 @@ def create_app() -> Flask:
             total_emp_excl += emp_excl
             total_workers += workers
             total_complete_excl += comp_excl
+            
+            # 만족도 계산: impact hub 제외
             if mapping['satisfaction'] and r.get(mapping['satisfaction']) is not None:
-                satisfaction_sum += satis
-                satisfaction_count += 1
+                if team != 'impact hub':  # impact hub 부서 제외
+                    satisfaction_sum += satis
+                    satisfaction_count += 1
             
             # 수료율 계산용: impact hub 제외
             if team != 'impact hub':
@@ -706,6 +709,11 @@ def create_app() -> Flask:
                     '취업률': kpi_window['취업률'],
                     '만족도': round((kpi_done_2025['만족도'] or 0) / 5 * 100, 2)
                 }
+                
+                # 디버깅 로그
+                print(f"[TRENDS DEBUG] {q}: 데이터 {len(brs)}건, 2025종강 {len(brs_end2025)}건, 종강+2025 {len(brs_done_2025)}건, 취업윈도우 {len(brs_window_done)}건")
+                print(f"[TRENDS DEBUG] {q} KPI: 모집률={kpi_100['모집률']}, 수료율={kpi_100['수료율']}, 취업률={kpi_100['취업률']}, 만족도={kpi_100['만족도']}")
+                
                 result.append(kpi_100)
             return jsonify(result)
         except Exception as e:
@@ -782,8 +790,25 @@ def create_app() -> Flask:
             start_col = mapping['start']
             end_col = mapping['end']
             year_col = mapping['year'] or '년도'
-            cur = conn.execute(f"SELECT * FROM kdt_programs WHERE {year_col} = ?", (year,))
+            status_col = mapping.get('status') or '진행상태'
+            
+            # 상태 필터 파라미터 받기 (기본값: '진행중')
+            status_filter = request.args.get('status', '진행중')
+            
+            # 상태에 따른 쿼리 생성
+            if status_filter == '전체':
+                where_clause = f"WHERE {year_col} = ?"
+                query_params = (year,)
+                print(f"[TIMELINE DEBUG] {year}년 전체 과정 조회")
+            else:
+                where_clause = f"WHERE {year_col} = ? AND {status_col} = ?"
+                query_params = (year, status_filter)
+                print(f"[TIMELINE DEBUG] {year}년 '{status_filter}' 상태 과정 조회")
+            
+            cur = conn.execute(f"SELECT * FROM kdt_programs {where_clause}", query_params)
             rows = [dict(r) for r in cur.fetchall()]
+            
+            print(f"[TIMELINE DEBUG] 조회 결과: {len(rows)}건")
             # Python-side sort by start date with fallback
             def start_key(r: Dict[str, Any]):
                 dt = safe_date(r.get(start_col)) if start_col else None
@@ -793,6 +818,8 @@ def create_app() -> Flask:
 
             rows.sort(key=start_key)
             events = []
+            today = date.today()
+            
             for r in rows:
                 sdt = safe_date(r.get(start_col)) if start_col else None
                 if not sdt:
@@ -800,17 +827,56 @@ def create_app() -> Flask:
                 edt = safe_date(r.get(end_col)) if end_col else None
                 if not edt:
                     edt = safe_date(r.get('종강'))
-                events.append({
-                    'id': r.get('id'),
-                    'name': r.get(mapping['name']),
-                    'course_code': r.get('과정코드') or '',
-                    'team': r.get(mapping['team']),
-                    'status': r.get(mapping['status']),
-                    'category': r.get('과정구분') or r.get(mapping['team']),
-                    'start': sdt.isoformat() if sdt else None,
-                    'end': edt.isoformat() if edt else None,
-                })
-            return jsonify(events)
+                
+                status = r.get(mapping.get('status', '')) or r.get('진행상태', '')
+                
+                # 상태 필터에 따른 추가 필터링
+                should_include = True
+                
+                if status_filter == '진행중':
+                    # 진행중: 상태가 '진행중'이고 현재 날짜가 과정 기간 내에 있어야 함
+                    is_ongoing_status = str(status).strip() == '진행중'
+                    is_in_period = True
+                    
+                    if sdt and edt:
+                        is_in_period = sdt <= today <= edt
+                    elif sdt:
+                        is_in_period = sdt <= today
+                    
+                    should_include = is_ongoing_status and is_in_period
+                    
+                elif status_filter == '종강':
+                    # 종강: 상태가 '종강'이거나 종강일이 오늘 이전인 과정
+                    is_completed_status = str(status).strip() == '종강'
+                    is_past_end = edt and edt < today if edt else False
+                    should_include = is_completed_status or is_past_end
+                    
+                else:  # '전체'
+                    # 전체: 모든 과정 표시
+                    should_include = True
+                
+                if should_include:
+                    events.append({
+                        'id': r.get('id'),
+                        'name': r.get(mapping['name']),
+                        'course_code': r.get('과정코드') or '',
+                        'team': r.get(mapping['team']),
+                        'status': status,
+                        'category': r.get('과정구분') or r.get(mapping['team']),
+                        'start': sdt.isoformat() if sdt else None,
+                        'end': edt.isoformat() if edt else None,
+                    })
+                    print(f"[TIMELINE DEBUG] 추가된 과정: {r.get(mapping['name'])} - 상태: {status}")
+                else:
+                    print(f"[TIMELINE DEBUG] 제외된 과정: {r.get(mapping['name'])} - 상태: {status}")
+            
+            print(f"[TIMELINE DEBUG] 최종 표시 과정: {len(events)}건 ('{status_filter}' 필터 적용)")
+            
+            return jsonify({
+                'events': events,
+                'filter': status_filter,
+                'total_count': len(events)
+            })
         except Exception as e:
             print(e)
             return jsonify([])

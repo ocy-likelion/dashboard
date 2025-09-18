@@ -19,8 +19,18 @@
           <li class="active" data-tab="dashboard-tab"><i class="fa-solid fa-gauge"></i> 대시보드</li>
           <li data-tab="education-tab"><i class="fa-solid fa-graduation-cap"></i> 교육 운영</li>
           <li data-tab="business-tab"><i class="fa-solid fa-briefcase"></i> 사업 운영</li>
-          <li data-tab="programs-tab"><i class="fa-solid fa-list-check"></i> 과정 관리</li>
           <li data-tab="settings-tab"><i class="fa-solid fa-gear"></i> 설정</li>
+        </ul>
+        
+        <!-- 데이터 관리 영역 -->
+        <div class="sidebar-separator">
+          <span class="separator-line"></span>
+          <span class="separator-text">데이터 관리</span>
+          <span class="separator-line"></span>
+        </div>
+        
+        <ul class="management-section">
+          <li data-tab="programs-tab"><i class="fa-solid fa-list-check"></i> 과정 관리</li>
         </ul>
       </nav>
       <button id="sidebarToggle" class="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
@@ -67,17 +77,98 @@
 
       <section id="dashboard-tab" class="tab-content active">
         <div class="cards" id="dashboard-kpis"></div>
-        <div class="toolbar">
-          <button class="btn" id="btnAllMetrics">전체 지표</button>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="trendChart" height="120"></canvas>
+        
+        <!-- 개선된 그래프 필터 영역 -->
+        <div class="dashboard-chart-section">
+          <div class="chart-header-enhanced">
+            <h3 class="chart-title-enhanced">
+              <i class="fa-solid fa-chart-line"></i>
+              지표 추이 분석
+            </h3>
+            <div class="chart-filters-enhanced">
+              <div class="filter-group-enhanced">
+                <label class="filter-label-enhanced">
+                  <i class="fa-solid fa-filter"></i>
+                  지표 선택
+                </label>
+                <div class="metric-selector">
+                  <button class="metric-btn active" data-metric="">
+                    <i class="fa-solid fa-chart-column"></i>
+                    전체 지표
+                  </button>
+                  <button class="metric-btn" data-metric="모객율">
+                    <i class="fa-solid fa-users"></i>
+                    모객율
+                  </button>
+                  <button class="metric-btn" data-metric="취업률">
+                    <i class="fa-solid fa-briefcase"></i>
+                    취업률
+                  </button>
+                  <button class="metric-btn" data-metric="만족도">
+                    <i class="fa-solid fa-star"></i>
+                    만족도
+                  </button>
+                  <button class="metric-btn" data-metric="수료률">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                    수료률
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrapper-enhanced">
+            <canvas id="trendChart" height="360"></canvas>
+          </div>
         </div>
       </section>
 
       <section id="education-tab" class="tab-content">
         <div class="cards" id="education-kpis"></div>
-        <div class="timeline" id="education-timeline"></div>
+        
+        <!-- 교육과정 타임라인 -->
+        <div class="timeline-section">
+          <div class="timeline-header">
+            <h3 class="timeline-title">
+              <i class="fa-solid fa-calendar-week"></i>
+              교육과정 타임라인
+            </h3>
+            <div class="timeline-controls">
+              <div class="timeline-filter-group">
+                <label class="timeline-filter-label">
+                  <i class="fa-solid fa-filter"></i>
+                  과정 상태
+                </label>
+                <div class="dropdown timeline-status-dropdown">
+                  <button class="dropdown-toggle timeline-status-toggle" type="button">
+                    <span class="status-text">진행중</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                  <ul class="dropdown-menu timeline-status-menu">
+                    <li><a href="#" data-status="진행중" class="active">
+                      <i class="fa-solid fa-play-circle"></i>
+                      진행중인 과정
+                    </a></li>
+                    <li><a href="#" data-status="종강">
+                      <i class="fa-solid fa-check-circle"></i>
+                      종강한 과정
+                    </a></li>
+                    <li><a href="#" data-status="전체">
+                      <i class="fa-solid fa-list"></i>
+                      전체 과정
+                    </a></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="timeline-info">
+                <span class="info-badge" id="timeline-info-badge">
+                  <i class="fa-solid fa-info-circle"></i>
+                  현재 진행중인 과정만 표시
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="timeline" id="education-timeline"></div>
+        </div>
       </section>
 
       <section id="business-tab" class="tab-content">
@@ -131,8 +222,20 @@
               <input id="monthlyMonth" type="number" placeholder="7" min="1" max="12" class="form-input month-input" />
             </div>
             <div class="input-group">
-              <label class="input-label">과정 검색</label>
-              <input id="monthlyProgramLike" type="text" placeholder="과정명 입력..." class="form-input search-input" />
+              <label class="input-label">과정 선택</label>
+              <div class="dropdown program-select-dropdown">
+                <button class="dropdown-toggle program-select-toggle" type="button">
+                  <span class="selected-text">과정 선택...</span>
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <ul class="dropdown-menu program-select-menu">
+                  <li><a href="#" data-value="">
+                    <i class="fa-solid fa-list"></i>
+                    전체 과정
+                  </a></li>
+                  <!-- 과정 목록은 JavaScript로 동적 생성 -->
+                </ul>
+              </div>
             </div>
             <button class="btn primary enhanced" id="btnLoadMonthly">
               <i class="fa-solid fa-magnifying-glass"></i>

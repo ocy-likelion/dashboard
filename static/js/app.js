@@ -47,10 +47,11 @@
         document.getElementById('sidebar').classList.toggle('collapsed');
       });
 
-      // Tabs
-      document.querySelectorAll('aside nav li').forEach(li => {
+      // Tabs (기본 내비게이션 + 데이터 관리 섹션)
+      document.querySelectorAll('aside nav li, aside .management-section li').forEach(li => {
         li.addEventListener('click', () => {
-          document.querySelectorAll('aside nav li').forEach(x=>x.classList.remove('active'));
+          // 모든 탭에서 active 클래스 제거
+          document.querySelectorAll('aside nav li, aside .management-section li').forEach(x=>x.classList.remove('active'));
           li.classList.add('active');
           const tabId = li.getAttribute('data-tab');
           document.querySelectorAll('.tab-content').forEach(sec=>sec.classList.remove('active'));
@@ -73,9 +74,60 @@
       document.getElementById('btnSaveProgram').addEventListener('click', ()=> this.saveProgram());
       document.getElementById('btnDeleteProgram').addEventListener('click', ()=> this.deleteProgram());
 
-      // Dashboard control
-      const btnAll = document.getElementById('btnAllMetrics');
-      btnAll.addEventListener('click', ()=> this.updateTrendChart());
+      // Dashboard control - 새로운 메트릭 버튼들
+      const metricBtns = document.querySelectorAll('.metric-btn');
+      metricBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          // 모든 버튼에서 active 클래스 제거
+          metricBtns.forEach(b => b.classList.remove('active'));
+          // 클릭된 버튼에 active 클래스 추가
+          btn.classList.add('active');
+          // 메트릭 업데이트
+          const metric = btn.dataset.metric;
+          this.updateTrendChart(metric);
+        });
+      });
+
+      // Timeline status filter
+      const timelineStatusToggle = document.querySelector('.timeline-status-toggle');
+      if (timelineStatusToggle) {
+        timelineStatusToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const dropdown = timelineStatusToggle.closest('.timeline-status-dropdown');
+          this.toggleTimelineDropdown(dropdown);
+        });
+      }
+      
+      const timelineStatusMenu = document.querySelector('.timeline-status-menu');
+      if (timelineStatusMenu) {
+        timelineStatusMenu.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const link = e.target.closest('a');
+          if (link && link.dataset.status) {
+            const status = link.dataset.status;
+            const year = this.state.year || '2025';
+            
+            // 상태 필터 업데이트
+            this.updateTimelineStatusActive(link);
+            
+            // 타임라인 리로드
+            this.loadTimeline(year, status);
+            
+            // 드롭다운 닫기
+            this.closeTimelineDropdowns();
+          }
+        });
+      }
+      
+      // 타임라인 드롭다운 외부 클릭 이벤트
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.timeline-status-dropdown')) {
+          this.closeTimelineDropdowns();
+        }
+      });
 
       // Business monthly expected
       const btnMonthly = document.getElementById('btnLoadMonthly');
@@ -86,8 +138,12 @@
             const m = document.getElementById('monthlyMonth').value || '7';
             const q = new URLSearchParams();
             q.set('year', y); q.set('month', m);
-            const like = (document.getElementById('monthlyProgramLike').value||'').trim();
-            if(like) q.set('program_like', like);
+            
+            // 드롭다운에서 선택된 과정 값 가져오기
+            const selectedProgram = this.getSelectedMonthlyProgram();
+            if(selectedProgram && selectedProgram !== '') {
+              q.set('program_like', selectedProgram);
+            }
             const res = await fetch(`/api/business/monthly-expected?${q.toString()}`);
             const out = await res.json();
             renderMonthlyExpectedTable(document.getElementById('monthly-expected'), out.items||[]);
@@ -203,11 +259,24 @@
           {label:'수료율', value: (kpis['수료율']||0).toFixed(2)+'%'}
         ], (label)=>{
           this.updateTrendChart(label);
+          this.updateMetricButtonState(label);
         });
         await this.updateTrendChart();
       }catch(err){
         console.error(err);
       }
+    }
+
+    // 메트릭 버튼 상태 업데이트
+    updateMetricButtonState(selectedMetric) {
+      const metricBtns = document.querySelectorAll('.metric-btn');
+      metricBtns.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.metric === selectedMetric || 
+            (selectedMetric === '' && btn.dataset.metric === '')) {
+          btn.classList.add('active');
+        }
+      });
     }
 
     async updateTrendChart(metric){
@@ -224,11 +293,24 @@
           '만족도': '#f59e0b',
           '수료율': '#ef4444'
         };
+        // 백엔드 키와 프론트엔드 라벨 매핑
+        const keyMapping = {
+          '모객율': '모집률',
+          '취업률': '취업률',
+          '만족도': '만족도',
+          '수료율': '수료율'
+        };
+        
         const keys = metric ? [metric] : ['모객율','취업률','만족도','수료율'];
         keys.forEach(k=>{
+          const backendKey = keyMapping[k] || k;
           datasets.push({
             label: k,
-            data: data.map(d=>d[k]||0),
+            data: data.map(d=> {
+              const value = d[backendKey] || 0;
+              console.log(`[CHART DEBUG] ${d.quarter}: ${k}(${backendKey}) = ${value}`);
+              return value;
+            }),
             fill: false,
             borderColor: palette[k],
             backgroundColor: palette[k],
@@ -240,7 +322,97 @@
         this.state.trendChart = new Chart(ctx, {
           type: 'line',
           data: { labels, datasets },
-          options: { responsive: true, maintainAspectRatio: false }
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  usePointStyle: true,
+                  padding: 20,
+                  font: {
+                    size: 12,
+                    weight: 'bold'
+                  }
+                }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: 'white',
+                bodyColor: 'white',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    const label = context.dataset.label || '';
+                    const value = context.parsed.y;
+                    
+                    if (label === '만족도') {
+                      // 만족도의 경우 원래 5점 만점 점수도 표시
+                      const originalScore = (value / 100 * 5).toFixed(1);
+                      return `${label}: ${value}점 (${originalScore}/5점)`;
+                    } else {
+                      // 다른 지표들은 % 표시
+                      return `${label}: ${value}%`;
+                    }
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.1)'
+                },
+                ticks: {
+                  font: {
+                    size: 11,
+                    weight: 'bold'
+                  }
+                }
+              },
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.1)'
+                },
+                ticks: {
+                  font: {
+                    size: 11
+                  },
+                  callback: function(value) {
+                    if (metric === '만족도') {
+                      // 만족도 단일 지표 보기일 때만 원래 점수 병기
+                      const originalScore = (value / 100 * 5).toFixed(1);
+                      return `${value} (${originalScore}/5)`;
+                    } else {
+                      return value + '%';
+                    }
+                  }
+                }
+              }
+            },
+            interaction: {
+              mode: 'nearest',
+              axis: 'x',
+              intersect: false
+            },
+            elements: {
+              point: {
+                radius: 6,
+                hoverRadius: 8,
+                borderWidth: 2,
+                hoverBorderWidth: 3
+              },
+              line: {
+                borderWidth: 3,
+                tension: 0.4
+              }
+            }
+          }
         });
       }catch(err){ console.error(err); }
     }
@@ -255,10 +427,58 @@
           {label:'전체 과정 수', value: String(stats['전체과정수']||0)},
           {label:'총 수강생', value: String(stats['총수강생']||0)}
         ]);
-        const tRes = await fetch(`/api/education/timeline/${y}`);
-        const timeline = await tRes.json();
-        renderTimeline(document.getElementById('education-timeline'), timeline);
+        
+        // 타임라인 로드 (기본 상태 필터 '진행중')
+        await this.loadTimeline(y, '진행중');
       }catch(err){ console.error(err); }
+    }
+    
+    // 타임라인 로드
+    async loadTimeline(year, status = '진행중') {
+      try {
+        const url = `/api/education/timeline/${year}?status=${encodeURIComponent(status)}`;
+        const tRes = await fetch(url);
+        const data = await tRes.json();
+        
+        // 상태에 따른 정보 배지 업데이트
+        this.updateTimelineInfo(status, data.total_count || 0);
+        
+        // 타임라인 렌더링 (data.events 사용)
+        renderTimeline(document.getElementById('education-timeline'), data.events || data);
+        
+        console.log(`[TIMELINE] ${year}년 ${status} 과정 ${data.total_count || 0}건 로드`);
+      } catch(err) { 
+        console.error('타임라인 로드 오류:', err); 
+      }
+    }
+    
+    // 타임라인 정보 배지 업데이트
+    updateTimelineInfo(status, count) {
+      const infoBadge = document.getElementById('timeline-info-badge');
+      const statusToggle = document.querySelector('.timeline-status-toggle .status-text');
+      
+      if (infoBadge && statusToggle) {
+        let infoText = '';
+        let toggleText = '';
+        
+        switch(status) {
+          case '진행중':
+            infoText = `현재 진행중인 과정 ${count}건 표시`;
+            toggleText = '진행중';
+            break;
+          case '종강':
+            infoText = `종강된 과정 ${count}건 표시`;
+            toggleText = '종강';
+            break;
+          case '전체':
+            infoText = `전체 과정 ${count}건 표시`;
+            toggleText = '전체';
+            break;
+        }
+        
+        infoBadge.innerHTML = `<i class="fa-solid fa-info-circle"></i> ${infoText}`;
+        statusToggle.textContent = toggleText;
+      }
     }
 
     // Business
@@ -290,6 +510,9 @@
 
         // 연도별 12개월 매출 차트 로드
         await this.loadYearlyMonthlyChart(y);
+        
+        // 과정 선택 드롭다운 초기화
+        await this.loadMonthlyProgramOptions();
       }catch(err){ console.error(err); }
     }
 
@@ -635,6 +858,152 @@
       t.classList.toggle('error', !!isError);
       t.classList.remove('hidden');
       setTimeout(()=> t.classList.add('hidden'), 1800);
+    }
+    
+    // 타임라인 상태 필터 활성 상태 업데이트
+    updateTimelineStatusActive(activeLink) {
+      const menu = document.querySelector('.timeline-status-menu');
+      if (menu) {
+        menu.querySelectorAll('a').forEach(link => link.classList.remove('active'));
+        activeLink.classList.add('active');
+      }
+    }
+    
+    // 타임라인 드롭다운 토글
+    toggleTimelineDropdown(dropdown) {
+      const isOpen = dropdown.classList.contains('open');
+      this.closeTimelineDropdowns();
+      if (!isOpen) {
+        dropdown.classList.add('open');
+        // 강제로 최상위로 올리기
+        this.forceDropdownToTop(dropdown);
+      }
+    }
+    
+    // 타임라인 드롭다운 닫기
+    closeTimelineDropdowns() {
+      document.querySelectorAll('.timeline-status-dropdown').forEach(d => {
+        d.classList.remove('open');
+        // z-index 최상위 클래스 제거
+        d.classList.remove('force-top');
+      });
+    }
+    
+    // 드롭다운을 강제로 최상위로 올리는 함수
+    forceDropdownToTop(dropdown) {
+      if (dropdown) {
+        dropdown.classList.add('force-top');
+        const menu = dropdown.querySelector('.dropdown-menu, .program-select-menu, .timeline-status-menu');
+        if (menu) {
+          menu.classList.add('force-top');
+        }
+      }
+    }
+    
+    // 월별 예상 매출 조회의 선택된 과정 값 가져오기
+    getSelectedMonthlyProgram() {
+      const toggle = document.querySelector('.program-select-toggle .selected-text');
+      if (toggle && toggle.textContent !== '과정 선택...') {
+        return toggle.dataset.value || '';
+      }
+      return '';
+    }
+    
+    // 과정 선택 드롭다운 초기화
+    async loadMonthlyProgramOptions() {
+      try {
+        const res = await fetch('/api/programs');
+        const programs = await res.json();
+        const menu = document.querySelector('.program-select-menu');
+        
+        if (menu) {
+          // 기존 메뉴 비우기 (전체 과정 옵션 제외)
+          const allOption = menu.querySelector('li:first-child');
+          menu.innerHTML = '';
+          if (allOption) menu.appendChild(allOption);
+          
+          // 과정 데이터로 옵션 추가
+          programs.forEach(program => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = '#';
+            a.dataset.value = program['과정명'] || program['HRD_Net_과정명'] || '';
+            
+            const courseCode = program['과정코드'] || '';
+            const courseName = program['과정명'] || program['HRD_Net_과정명'] || '';
+            const round = program['회차'] || '';
+            
+            a.innerHTML = `
+              <i class="fa-solid fa-graduation-cap"></i>
+              <span class="program-info">
+                <span class="program-name">${courseCode ? `[${courseCode}] ` : ''}${courseName}</span>
+                ${round ? `<small class="program-round">${round}회차</small>` : ''}
+              </span>
+            `;
+            
+            li.appendChild(a);
+            menu.appendChild(li);
+          });
+          
+          this.bindProgramSelectEvents();
+        }
+      } catch (err) {
+        console.error('과정 데이터 로드 오류:', err);
+      }
+    }
+    
+    // 과정 선택 드롭다운 이벤트 바인딩
+    bindProgramSelectEvents() {
+      const toggle = document.querySelector('.program-select-toggle');
+      const menu = document.querySelector('.program-select-menu');
+      const dropdown = document.querySelector('.program-select-dropdown');
+      
+      if (toggle) {
+        toggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const isOpen = dropdown?.classList.contains('open');
+          
+          // 다른 드롭다운 닫기
+          document.querySelectorAll('.dropdown.open, .program-select-dropdown.open, .timeline-status-dropdown.open').forEach(d => {
+            d.classList.remove('open', 'force-top');
+          });
+          
+          if (!isOpen) {
+            dropdown?.classList.add('open');
+            // 강제로 최상위로 올리기
+            this.forceDropdownToTop(dropdown);
+          }
+        });
+      }
+      
+      if (menu) {
+        menu.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const link = e.target.closest('a');
+          if (link) {
+            const value = link.dataset.value || '';
+            const text = value ? link.querySelector('.program-name')?.textContent || '과정 선택...' : '전체 과정';
+            
+            const selectedText = toggle?.querySelector('.selected-text');
+            if (selectedText) {
+              selectedText.textContent = text;
+              selectedText.dataset.value = value;
+            }
+            
+            dropdown?.classList.remove('open', 'force-top');
+          }
+        });
+      }
+      
+      // 외부 클릭 시 드롭다운 닫기
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.program-select-dropdown')) {
+          dropdown?.classList.remove('open', 'force-top');
+        }
+      });
     }
   }
 
